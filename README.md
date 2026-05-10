@@ -56,7 +56,7 @@ export XDG_CACHE_HOME=~/tmp/codex-cache
 
 ## Quick install
 
-The fastest path: install deps, build the local app, build the native package, install it.
+The fastest path is to install dependencies, build the local app, build the native package, and install it.
 
 ```bash
 git clone https://github.com/ilysenko/codex-desktop-linux.git
