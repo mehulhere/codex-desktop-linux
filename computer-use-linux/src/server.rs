@@ -820,6 +820,12 @@ struct ActivateWindowOutput {
     focus: Option<WindowFocusResult>,
     error: Option<String>,
     permissions_hint: Option<String>,
+    // Debug-only echo of the request. `serde_json::Value` serializes to a
+    // non-object schema (schemars emits the boolean schema `true`), which strict
+    // MCP clients reject in `outputSchema` — one invalid tool fails the whole
+    // `tools/list`. Keep it in the runtime response (serde) but omit it from the
+    // generated schema.
+    #[schemars(skip)]
     received: Option<serde_json::Value>,
 }
 
@@ -1087,6 +1093,12 @@ struct ActionOutput {
     implemented: bool,
     action: String,
     message: String,
+    // Debug-only echo of the request. `serde_json::Value` serializes to a
+    // non-object schema (schemars emits the boolean schema `true`), which strict
+    // MCP clients reject in `outputSchema` — one invalid tool fails the whole
+    // `tools/list`. Keep it in the runtime response (serde) but omit it from the
+    // generated schema.
+    #[schemars(skip)]
     received: Option<serde_json::Value>,
 }
 
