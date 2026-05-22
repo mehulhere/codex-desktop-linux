@@ -23,6 +23,7 @@ const {
   applyLinuxChromePluginAutoInstallPatch,
   applyLinuxAppUpdaterBridgePatch,
   applyLinuxAppUpdaterMenuPatch,
+  applyLinuxBuildInfoTrayPatch,
   applyLinuxExplicitIpcQuitPatch,
   applyLinuxExplicitQuitPromptBypassPatch,
   applyLinuxExplicitTrayQuitPatch,
@@ -63,6 +64,10 @@ const {
 const {
   validateReport,
 } = require("./ci/validate-patch-report.js");
+const {
+  buildInfo,
+  packageProfile,
+} = require("./lib/build-info.js");
 const {
   applyBrowserAnnotationScreenshotPatch,
   applyPersistentRateLimitFooterPatch,
@@ -200,6 +205,82 @@ test("Linux target context parses distro, package, and desktop details", () => {
   }
 });
 
+test("build info captures DMG hash, features, distro profile, and source revision", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codex-build-info-"));
+  try {
+    const dmgPath = path.join(tempRoot, "Codex.dmg");
+    fs.writeFileSync(dmgPath, "fake dmg payload", "utf8");
+
+    const appDir = path.join(tempRoot, "Codex.app");
+    fs.mkdirSync(path.join(appDir, "Contents"), { recursive: true });
+    fs.writeFileSync(
+      path.join(appDir, "Contents", "Info.plist"),
+      [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+        '<plist version="1.0"><dict>',
+        "<key>CFBundleShortVersionString</key><string>1.2.3</string>",
+        "</dict></plist>",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const featuresRoot = path.join(tempRoot, "linux-features");
+    fs.mkdirSync(featuresRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(featuresRoot, "features.json"),
+      JSON.stringify({ enabled: ["read-aloud", "zed-opener"] }),
+      "utf8",
+    );
+
+    const info = buildInfo({
+      repoDir: tempRoot,
+      dmgPath,
+      appDir,
+      electronVersion: "41.3.0",
+      appId: "codex-desktop",
+      appDisplayName: "Codex Desktop",
+      featuresRoot,
+      env: {
+        CODEX_LINUX_SOURCE_COMMIT: "abcdef1234567890",
+        CODEX_LINUX_SOURCE_BRANCH: "main",
+      },
+      linuxTarget: detectLinuxTargetContext({
+        osReleaseFields: {
+          ID: "ubuntu",
+          ID_LIKE: "debian",
+          VERSION_ID: "24.04",
+          PRETTY_NAME: "Ubuntu 24.04 LTS",
+        },
+        env: { PATH: "" },
+      }),
+    });
+
+    assert.equal(info.upstreamDmg.sha256, "e33df8d941faed4fdc3bb688fea70572931e81a6e0c2603b810338177148dfa2");
+    assert.equal(info.upstreamDmg.appVersion, "1.2.3");
+    assert.equal(info.source.shortCommit, "abcdef123456");
+    assert.equal(info.packageProfile.id, "debian-family");
+    assert.equal(info.packageProfile.packageManager, "apt");
+    assert.deepEqual(info.linuxFeatures.enabled, ["read-aloud", "zed-opener"]);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("package profile distinguishes Fedora package managers by major version", () => {
+  const fedora40 = detectLinuxTargetContext({
+    osReleaseFields: { ID: "fedora", VERSION_ID: "40", PRETTY_NAME: "Fedora Linux 40" },
+    env: { PATH: "" },
+  });
+  const fedora41 = detectLinuxTargetContext({
+    osReleaseFields: { ID: "fedora", VERSION_ID: "41", PRETTY_NAME: "Fedora Linux 41" },
+    env: { PATH: "" },
+  });
+
+  assert.equal(packageProfile(fedora40).packageManager, "dnf");
+  assert.equal(packageProfile(fedora41).packageManager, "dnf5");
+});
+
 test("auto-discovered core patches can target a specific Linux distro", () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codex-core-patch-root-"));
   try {
@@ -312,6 +393,7 @@ test("default core patch descriptors are grouped and unique", () => {
     "linux-avatar-overlay-mouse-passthrough",
     "linux-file-manager",
     "linux-tray",
+    "linux-build-info-tray",
     "linux-single-instance",
     "linux-computer-use-ui-feature",
     "linux-computer-use-plugin-gate",
@@ -1108,6 +1190,17 @@ test("adds Linux tray support including the platform guard", () => {
     /\(E\|\|process\.platform===`linux`&&\(typeof codexLinuxIsTrayEnabled!==`function`\|\|codexLinuxIsTrayEnabled\(\)\)\)&&oe\(\);/,
   );
   assert.doesNotMatch(patched, /process\.platform===`linux`&&codexLinuxIsTrayEnabled\(\)/);
+});
+
+test("adds Linux build information to the tray menu", () => {
+  const patched = applyPatchTwice(applyLinuxBuildInfoTrayPatch, `${mainBundlePrefix}${trayBundleFixture()}`);
+
+  assert.match(patched, /function codexLinuxShowBuildInfo\(\)/);
+  assert.match(patched, /codex-linux-build-info\.json/);
+  assert.match(patched, /label:`Build Information`,click:\(\)=>\{codexLinuxShowBuildInfo\(\)\}/);
+  assert.match(patched, /Enabled features:/);
+  assert.match(patched, /Upstream DMG SHA256:/);
+  assert.match(patched, /Linux source revision:/);
 });
 
 test("adds Linux tray support for current minified window and startup identifiers", () => {

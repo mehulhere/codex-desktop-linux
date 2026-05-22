@@ -411,6 +411,51 @@ Install the Rust toolchain:
     [ -x "$UPDATER_BINARY_SOURCE" ] || error "Failed to build updater binary: $UPDATER_BINARY_SOURCE"
 }
 
+stage_update_builder_source_info() {
+    local update_builder_root="$1"
+    local info_dir="$update_builder_root/.codex-linux"
+    local info_file="$info_dir/source-info.json"
+    local node_bin
+
+    mkdir -p "$info_dir"
+    node_bin="$(package_node_binary)"
+    "$node_bin" - "$REPO_DIR" "$info_file" <<'NODE'
+const childProcess = require("node:child_process");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const [repoDir, infoFile] = process.argv.slice(2);
+
+function git(args) {
+  const result = childProcess.spawnSync("git", ["-C", repoDir, ...args], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+  if (result.status !== 0) {
+    return null;
+  }
+  const value = result.stdout.trim();
+  return value.length > 0 ? value : null;
+}
+
+const commit = process.env.CODEX_LINUX_SOURCE_COMMIT?.trim() || git(["rev-parse", "HEAD"]);
+const status = git(["status", "--porcelain"]);
+const info = {
+  commit,
+  shortCommit: commit == null ? null : commit.slice(0, 12),
+  branch: process.env.CODEX_LINUX_SOURCE_BRANCH?.trim() || git(["branch", "--show-current"]),
+  remote: process.env.CODEX_LINUX_SOURCE_REMOTE?.trim() || git(["remote", "get-url", "origin"]),
+  describe: process.env.CODEX_LINUX_SOURCE_DESCRIBE?.trim() || git(["describe", "--always", "--dirty", "--tags"]),
+  dirty: status == null ? null : status.length > 0,
+  provenance: "packaged-update-builder",
+  capturedAt: new Date().toISOString(),
+};
+
+fs.mkdirSync(path.dirname(infoFile), { recursive: true });
+fs.writeFileSync(infoFile, `${JSON.stringify(info, null, 2)}\n`, "utf8");
+NODE
+}
+
 stage_common_package_files() {
     local root="$1"
     local app_root="$root/opt/$PACKAGE_NAME"
@@ -501,6 +546,8 @@ stage_update_builder_bundle() {
     cp "$REPO_DIR/scripts/lib/linux-update-bridge-patch.js" "$update_builder_root/scripts/lib/linux-update-bridge-patch.js"
     cp "$REPO_DIR/scripts/lib/patch-report.js" "$update_builder_root/scripts/lib/patch-report.js"
     cp "$REPO_DIR/scripts/lib/rebuild-report.sh" "$update_builder_root/scripts/lib/rebuild-report.sh"
+    cp "$REPO_DIR/scripts/lib/build-info.js" "$update_builder_root/scripts/lib/build-info.js"
+    cp "$REPO_DIR/scripts/lib/build-info.sh" "$update_builder_root/scripts/lib/build-info.sh"
     cp "$REPO_DIR/packaging/linux/control" "$update_builder_root/packaging/linux/control"
     cp "$REPO_DIR/packaging/linux/codex-desktop.spec" "$update_builder_root/packaging/linux/codex-desktop.spec"
     cp "$REPO_DIR/packaging/linux/codex-desktop.desktop" "$update_builder_root/packaging/linux/codex-desktop.desktop"
@@ -520,6 +567,7 @@ stage_update_builder_bundle() {
     stage_update_builder_linux_features_config "$update_builder_root"
     cp "$REPO_DIR/packaging/linux/codex-update-manager.postrm" "$update_builder_root/packaging/linux/codex-update-manager.postrm"
     cp "$REPO_DIR/assets/codex.png" "$update_builder_root/assets/codex.png"
+    stage_update_builder_source_info "$update_builder_root"
     if [ -d "$node_runtime_source" ]; then
         cp -a "$node_runtime_source" "$update_builder_root/node-runtime"
     else

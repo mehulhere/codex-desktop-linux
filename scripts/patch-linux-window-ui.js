@@ -54,6 +54,7 @@ const {
 } = require("./patches/launch-actions.js");
 const {
   applyBrowserUseNodeReplApprovalPatch,
+  applyLinuxBuildInfoTrayPatch,
   applyLinuxChromeExtensionStatusPatch,
   applyLinuxExplicitIpcQuitPatch,
   applyLinuxExplicitQuitPromptBypassPatch,
@@ -153,6 +154,7 @@ module.exports = {
   applyLinuxAppUpdaterMenuPatch,
   applyLinuxAvatarOverlayMousePassthroughPatch,
   applyLinuxBrowserUseIabVisibleOnCreatePatch,
+  applyLinuxBuildInfoTrayPatch,
   applyLinuxChromeExtensionStatusPatch,
   applyLinuxChromePluginAutoInstallPatch,
   applyLinuxComputerUseFeaturePatch,
