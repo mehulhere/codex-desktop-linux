@@ -2067,6 +2067,7 @@ PY
     assert_contains "$REPO_DIR/scripts/lib/process-detection.sh" "Codex Desktop is currently running from"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "prompt_install_missing_cli"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "prompt-install-cli"
+    assert_contains "$REPO_DIR/launcher/start.sh.template" '.npm-global/bin/codex'
     assert_contains "$REPO_DIR/launcher/start.sh.template" "CODEX_UPDATE_MANAGER_PATH"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "resolve_update_manager_path"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "run_update_manager"
