@@ -54,6 +54,7 @@ const {
   applyLinuxAppSunsetPatch,
   applyLinuxBrowserUseAvailabilityPatch,
   applyLinuxBrowserUseExternalAvailabilityPatch,
+  applyLinuxProjectlessXdgDocumentsDirPatch,
   applyLinuxBrowserUseNonLocalNavigationPatch,
   applyLinuxAppServerBackfillWaitPatch,
   applyLinuxOpaqueBackgroundPatch,
@@ -68,12 +69,14 @@ const {
   applyLinuxTrayPatch,
   applyLinuxWillQuitDrainTimeoutPatch,
   applyLinuxWindowOptionsPatch,
+  applyLinuxXdgDocumentsDirPatch,
   applySubagentNicknameMetadataPatch,
   isComputerUseUiEnabled,
   patchMainBundleSource,
   patchExtractedApp,
   patchPackageJson,
   patchLinuxAppUpdaterBridge,
+  patchProjectlessDocumentsAssets,
   patchKeybindsSettingsAssets,
   patchAutomationScheduleAssets,
   createPatchReport,
@@ -666,6 +669,8 @@ test("default core patch descriptors are grouped and unique", () => {
     "linux-launch-actions",
     "linux-hotkey-window-prewarm",
     "linux-git-origins-source-fallback",
+    "linux-xdg-documents-dir",
+    "linux-projectless-xdg-documents-dir",
     "linux-i18n-gate",
     "linux-profile-settings-menu",
     "automation-schedule-multi-time-rrule",
@@ -1128,6 +1133,100 @@ test("adds Linux file manager support without relying on exact minified variable
   assert.match(patched, /linux:\{label:`File Manager`/);
   assert.match(patched, /detect:\(\)=>`linux-file-manager`/);
   assert.match(patched, /n\.shell\.openPath\(__codexOpenTarget\)/);
+});
+
+test("uses XDG user documents directory for projectless Codex folders on Linux", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codex-xdg-documents-"));
+  try {
+    const configDir = path.join(tempRoot, "config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "user-dirs.dirs"),
+      'XDG_DOCUMENTS_DIR="$HOME/My\\ Documents"\n',
+      "utf8",
+    );
+
+    const source = [
+      "let i={default:require(`node:path`)},o=require(`node:fs`);",
+      "function ST(e,t,n){let r=CT(n),i=r.resolve(e),a=r.resolve(t);return n===`win32`?i.toLowerCase()===a.toLowerCase():i===a}",
+      "function CT(e){return e===`win32`?i.default.win32:i.default.posix}",
+      "function vT({desktopPaths:e,homeDir:t,platform:n}){return ST(t,e.getPath(`home`),n)?e.getPath(`documents`):CT(n).join(t,`Documents`)}",
+    ].join("");
+
+    const patched = applyPatchTwice(applyLinuxXdgDocumentsDirPatch, source);
+    const context = {
+      home: "/home/example",
+      process: { env: { XDG_CONFIG_HOME: configDir } },
+      require,
+      result: null,
+    };
+
+    vm.runInNewContext(
+      `${patched};result=vT({desktopPaths:{getPath:e=>e===\`home\`?home:e===\`documents\`?home+\`/Documents\`:null},homeDir:home,platform:\`linux\`});`,
+      context,
+    );
+
+    assert.match(patched, /codexLinuxXdgDocumentsDir/);
+    assert.match(patched, /`\$1`/);
+    assert.equal(context.result, "/home/example/My Documents");
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("uses XDG user documents directory for generated projectless workspaces", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codex-projectless-xdg-documents-"));
+  try {
+    const configDir = path.join(tempRoot, "config");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(configDir, "user-dirs.dirs"),
+      'XDG_DOCUMENTS_DIR="$HOME/My\\ Documents"\n',
+      "utf8",
+    );
+
+    const source =
+      "function Mb({homeDirectory:e,path:t}){return t.join(e,`Documents`,`Codex`)}function Lb({homeDirectory:e,path:t}){return Mb({homeDirectory:e,path:t})}function Rb(e){return e}";
+    const patched = applyPatchTwice(applyLinuxProjectlessXdgDocumentsDirPatch, source);
+    const context = {
+      home: "/home/example",
+      process: { platform: "linux", env: { XDG_CONFIG_HOME: configDir } },
+      require,
+      result: null,
+    };
+
+    vm.runInNewContext(
+      `${patched};result=Mb({homeDirectory:home,path:require(\`node:path\`).posix});`,
+      context,
+    );
+
+    assert.match(patched, /codexLinuxProjectlessDocumentsDir/);
+    assert.match(patched, /`\$1`/);
+    assert.equal(context.result, "/home/example/My Documents/Codex");
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("projectless documents asset patch updates Vite build bundle", () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "codex-projectless-xdg-asset-"));
+  try {
+    const buildDir = path.join(tempRoot, ".vite", "build");
+    fs.mkdirSync(buildDir, { recursive: true });
+    const bundlePath = path.join(buildDir, "src-test.js");
+    fs.writeFileSync(
+      bundlePath,
+      "function Mb({homeDirectory:e,path:t}){return t.join(e,`Documents`,`Codex`)}async function Lb(){throw Error(`Projectless thread directory must be a real directory`)}",
+      "utf8",
+    );
+
+    assert.deepEqual(patchProjectlessDocumentsAssets(tempRoot), { matched: 1, changed: 1 });
+    const patched = fs.readFileSync(bundlePath, "utf8");
+    assert.match(patched, /function codexLinuxProjectlessDocumentsDir/);
+    assert.deepEqual(patchProjectlessDocumentsAssets(tempRoot), { matched: 1, changed: 0 });
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
 });
 
 test("preserves user-enabled remote_control config on Linux", () => {
