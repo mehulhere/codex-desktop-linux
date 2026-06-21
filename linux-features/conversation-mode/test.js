@@ -91,6 +91,10 @@ const composerControlSource =
 const currentComposerControlSource =
   "function hz(e){let{conversationId:v,isResponseInProgress:A,onStop:P,submitBlockReason:F,voiceControls:z}=e,{canRetryDictation:K,dictationShortcutLabel:q,isDictating:J,isDictationSupported:ee,isNewRealtimeConversationAvailable:te,isRealtimeSubmitStarting:ne,isTranscribing:re,startDictation:se,startNewRealtimeConversation:ce,stopDictation:le,threadRealtime:ue}=z;let Be=ze,Ve=F===`empty-message`&&!A&&(ue.isAvailable&&ue.phase!==`active`||te),He=oi(fc,`composer.startVoiceMode`),Ue;Ue=()=>{if(ue.phase===`starting`||ue.phase===`active`){ue.stopRealtime();return}if(ue.isAvailable){ue.phase===`inactive`&&ue.startRealtime(`composer_button_existing_thread`);return}ce()};}";
 
+const currentComposerControlSourceWithDecoyProps =
+  "function decoy(e){let{conversationId:badId,isResponseInProgress:badProgress,onStop:badStop,submitBlockReason:badReason,voiceControls:badVoiceControls}=e;return badId||badProgress||badStop||badReason||badVoiceControls}" +
+  currentComposerControlSource;
+
 const halfPatchedCurrentComposerControlSource =
   "function hz(e){let{conversationId:v,isResponseInProgress:A,onStop:P,submitBlockReason:F,voiceControls:z}=e,{canRetryDictation:K,dictationShortcutLabel:q,isDictating:J,isDictationSupported:ee,isNewRealtimeConversationAvailable:te,isRealtimeSubmitStarting:ne,isTranscribing:re,startDictation:se,startNewRealtimeConversation:ce,stopDictation:le,threadRealtime:ue}=z;let Be=ze,Ve=F===`empty-message`&&!A&&(ue.isAvailable&&ue.phase!==`active`||te),He=oi(fc,`composer.startVoiceMode`),Ue;Ue=()=>{if(globalThis.codexLinuxConversationToggle?.({conversationId:v,startDictation:se,stopDictation:le,onStop:P,isDictating:te,isTranscribing:re,isResponseInProgress:A,isDictationSupported:q}))return;if(ue.phase===`starting`||ue.phase===`active`){ue.stopRealtime();return}if(ue.isAvailable){ue.phase===`inactive`&&ue.startRealtime(`composer_button_existing_thread`);return}ce()};}";
 
@@ -1739,6 +1743,22 @@ test("composer control patch follows the current composer voiceControls shape", 
   assert.match(patched, /\|\|ue\.isAvailable&&ue\.phase!==`active`\|\|te/);
   assert.doesNotMatch(patched, /isDictating:te/);
   assert.doesNotMatch(patched, /isDictationSupported:q/);
+});
+
+test("composer control patch scopes current composer props to the composer binding", () => {
+  const patched = twice(applyComposerControlPatch, currentComposerControlSourceWithDecoyProps);
+  assert.match(
+    patched,
+    /codexLinuxConversationSync\?\.\(v,\{isResponseInProgress:A,isDictating:J,isTranscribing:re,startDictation:se,stopDictation:le,onStop:P\}\)/,
+  );
+  assert.match(
+    patched,
+    /codexLinuxConversationToggle\?\.\(\{conversationId:v,startDictation:se,stopDictation:le,onStop:P,isDictating:J,isTranscribing:re,isResponseInProgress:A,isDictationSupported:ee\}\)/,
+  );
+  assert.doesNotMatch(patched, /codexLinuxConversationSync\?\.\(badId/);
+  assert.doesNotMatch(patched, /codexLinuxConversationToggle\?\.\(\{conversationId:badId/);
+  assert.doesNotMatch(patched, /codexLinuxConversationSync\?\.\([^)]*\{[^}]*isResponseInProgress:badProgress/);
+  assert.doesNotMatch(patched, /codexLinuxConversationToggle\?\.\([^)]*onStop:badStop/);
 });
 
 test("composer control patch repairs bundles where only the click handler was patched", () => {

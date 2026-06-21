@@ -120,11 +120,44 @@ function escapeRegExp(value) {
 
 const JS_IDENT = "[A-Za-z_$][\\w$]*";
 
+function objectPropVar(objectSource, name, fallback) {
+  return objectSource.match(new RegExp(`(?:^|,)\\s*${escapeRegExp(name)}:(${JS_IDENT})(?:,|$)`))?.[1] ?? fallback;
+}
+
+function currentComposerBinding(source) {
+  const bindingPattern = new RegExp(
+    `\\{([^{}]*)\\}\\s*=\\s*${JS_IDENT}\\s*,\\s*` +
+      `\\{([^{}]*startDictation:[^{}]*stopDictation:[^{}]*threadRealtime:[^{}]*)\\}\\s*=\\s*(${JS_IDENT})`,
+    "g",
+  );
+  for (const match of source.matchAll(bindingPattern)) {
+    const propsObject = match[1];
+    const voiceControlsObject = match[2];
+    const voiceControlsVar = match[3];
+    if (objectPropVar(propsObject, "voiceControls", null) !== voiceControlsVar) {
+      continue;
+    }
+    const requiredProps = ["conversationId", "isResponseInProgress", "onStop", "submitBlockReason"];
+    if (requiredProps.every((name) => objectPropVar(propsObject, name, null) != null)) {
+      return { propsObject, voiceControlsObject, voiceControlsVar };
+    }
+  }
+  return null;
+}
+
 function voiceControlsObjectVar(source) {
+  const currentBinding = currentComposerBinding(source);
+  if (currentBinding != null) {
+    return currentBinding.voiceControlsVar;
+  }
   return source.match(/voiceControls:([A-Za-z_$][\w$]*)/)?.[1] ?? "z";
 }
 
 function voiceControlVar(source, name, fallback) {
+  const currentBinding = currentComposerBinding(source);
+  if (currentBinding != null) {
+    return objectPropVar(currentBinding.voiceControlsObject, name, fallback);
+  }
   const voiceControlsVar = voiceControlsObjectVar(source);
   const match = source.match(
     new RegExp(`\\{([^{}]*startDictation:[^{}]*stopDictation:[^{}]*threadRealtime:[^{}]*)\\}=${escapeRegExp(voiceControlsVar)}`),
@@ -132,11 +165,15 @@ function voiceControlVar(source, name, fallback) {
   if (!match) {
     return fallback;
   }
-  return match[1].match(new RegExp(`${name}:([A-Za-z_$][\\w$]*)`))?.[1] ?? fallback;
+  return objectPropVar(match[1], name, fallback);
 }
 
 function composerPropVar(source, name, fallback) {
-  return source.match(new RegExp(`${name}:([A-Za-z_$][\\w$]*)`))?.[1] ?? fallback;
+  const currentBinding = currentComposerBinding(source);
+  if (currentBinding == null) {
+    return fallback;
+  }
+  return objectPropVar(currentBinding.propsObject, name, fallback);
 }
 
 function composerPropVars(source) {
