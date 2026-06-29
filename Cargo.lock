@@ -518,6 +518,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "codex-record-replay-linux"
+version = "0.1.0-linux-alpha1"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "codex-computer-use-linux",
+ "rmcp",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "codex-update-manager"
 version = "0.8.6"
 dependencies = [
