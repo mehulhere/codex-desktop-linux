@@ -470,6 +470,18 @@ function enabledLinuxFeatureStageHooks(options = {}) {
     .filter((hook) => hook.path != null);
 }
 
+function disabledLinuxFeatureCleanupHooks(options = {}) {
+  const featuresRoot = linuxFeaturesRoot(options);
+  const enabled = new Set(enabledLinuxFeatureIds({ ...options, featuresRoot }));
+  return discoverLinuxFeatureManifests({ ...options, featuresRoot })
+    .filter((feature) => !enabled.has(feature.id))
+    .map((feature) => ({
+      id: feature.id,
+      path: resolveFeatureEntrypoint(feature, "cleanupHook"),
+    }))
+    .filter((hook) => hook.path != null);
+}
+
 function normalizeEntryList(value, label, feature) {
   if (value == null) {
     return [];
@@ -750,6 +762,12 @@ function main() {
     }
     return;
   }
+  if (command === "--cleanup-hooks") {
+    for (const hook of disabledLinuxFeatureCleanupHooks()) {
+      process.stdout.write(`${hook.id}\t${hook.path}\n`);
+    }
+    return;
+  }
   if (command === "--package-hooks") {
     const packageFormat = process.argv[3] ?? "";
     for (const hook of enabledLinuxFeaturePackageHooks({ packageFormat })) {
@@ -789,7 +807,7 @@ function main() {
     process.stdout.write(`${linuxFeaturesRoot()}\n`);
     return;
   }
-  console.error("Usage: linux-features.js --enabled | --features-json | --features-root | --stage-install <install-dir> | --staged-files-json <install-dir> | --stage-hooks | --package-hooks <format>");
+  console.error("Usage: linux-features.js --enabled | --features-json | --features-root | --stage-install <install-dir> | --staged-files-json <install-dir> | --stage-hooks | --cleanup-hooks | --package-hooks <format>");
   process.exit(1);
 }
 
@@ -803,6 +821,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  disabledLinuxFeatureCleanupHooks,
   discoverLinuxFeatureManifests,
   enabledLinuxFeatureIds,
   enabledLinuxFeatureInstallPlan,
