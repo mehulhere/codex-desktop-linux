@@ -3742,6 +3742,8 @@ EOF
     assert_contains "$REPO_DIR/flake.nix" "https://static.crates.io/crates/"
     assert_contains "$REPO_DIR/flake.nix" "api/v1/crates/"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "MANAGED_NODE_BIN_DIR"
+    assert_not_contains "$REPO_DIR/launcher/start.sh.template" 'export PATH="$MANAGED_NODE_BIN_DIR:$PATH"'
+    assert_contains "$REPO_DIR/launcher/start.sh.template" 'CODEX_BROWSER_USE_NODE_PATH="$MANAGED_NODE_BIN_DIR/node"'
     assert_contains "$REPO_DIR/updater/src/builder.rs" "managed_node_bin_dirs"
     assert_contains "$REPO_DIR/scripts/build-rpm.sh" "stage_common_package_files"
     assert_contains "$REPO_DIR/scripts/build-rpm.sh" "PACKAGED_RUNTIME_SOURCE"

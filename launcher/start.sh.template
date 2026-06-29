@@ -540,13 +540,9 @@ export_packaged_runtime_env() {
     fi
 }
 
-prepend_managed_node_runtime_to_path() {
+export_managed_node_runtime_env() {
     [ -x "$MANAGED_NODE_BIN_DIR/node" ] || return 0
 
-    case ":$PATH:" in
-        *":$MANAGED_NODE_BIN_DIR:"*) ;;
-        *) export PATH="$MANAGED_NODE_BIN_DIR:$PATH" ;;
-    esac
     export CODEX_MANAGED_NODE_RUNTIME_DIR="$SCRIPT_DIR/resources/node-runtime"
 }
 
@@ -2978,7 +2974,7 @@ hydrate_graphical_session_env
 configure_side_by_side_app_env
 export_feature_runtime_env
 load_packaged_runtime_helper
-prepend_managed_node_runtime_to_path
+export_managed_node_runtime_env
 source_feature_env_files
 register_url_scheme_handlers
 log_phase "initial_launch_state_refresh_start"
