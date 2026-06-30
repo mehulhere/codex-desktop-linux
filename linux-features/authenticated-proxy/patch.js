@@ -69,12 +69,19 @@ function applyAuthenticatedProxyPatch(currentSource) {
     }
   }
 
-  const fetchNeedle =
-    `let d=i==null?await ${electronVar}.net.fetch(o,{method:r,headers:t,body:p(),signal:s}):await this.performProgressRequest({body:p(),headers:t,method:r,onUploadProgress:i,resolvedUrl:o,signal:s});`;
-  const fetchReplacement =
-    `let d=i==null&&!codexLinuxProxyAuthEntry()?await ${electronVar}.net.fetch(o,{method:r,headers:t,body:p(),signal:s}):await this.performProgressRequest({body:p(),headers:t,method:r,onUploadProgress:i,resolvedUrl:o,signal:s});`;
-  if (patchedSource.includes(fetchNeedle)) {
-    patchedSource = patchedSource.replace(fetchNeedle, fetchReplacement);
+  const fetchReplacements = [
+    [
+      `let d=i==null?await ${electronVar}.net.fetch(o,{method:r,headers:t,body:p(),signal:s}):await this.performProgressRequest({body:p(),headers:t,method:r,onUploadProgress:i,resolvedUrl:o,signal:s});`,
+      `let d=i==null&&!codexLinuxProxyAuthEntry()?await ${electronVar}.net.fetch(o,{method:r,headers:t,body:p(),signal:s}):await this.performProgressRequest({body:p(),headers:t,method:r,onUploadProgress:i,resolvedUrl:o,signal:s});`,
+    ],
+    [
+      `let d=i==null?await ${electronVar}.net.fetch(o,{method:r,headers:t,body:p(),signal:s,credentials:c?\`include\`:\`same-origin\`}):await this.performProgressRequest({body:p(),headers:t,method:r,onUploadProgress:i,resolvedUrl:o,signal:s,useSessionCookies:c});`,
+      `let d=i==null&&!codexLinuxProxyAuthEntry()?await ${electronVar}.net.fetch(o,{method:r,headers:t,body:p(),signal:s,credentials:c?\`include\`:\`same-origin\`}):await this.performProgressRequest({body:p(),headers:t,method:r,onUploadProgress:i,resolvedUrl:o,signal:s,useSessionCookies:c});`,
+    ],
+  ];
+  const fetchReplacement = fetchReplacements.find(([needle]) => patchedSource.includes(needle));
+  if (fetchReplacement != null) {
+    patchedSource = patchedSource.replace(fetchReplacement[0], fetchReplacement[1]);
   } else if (
     patchedSource.includes("performDesktopFetch") &&
     !patchedSource.includes("!codexLinuxProxyAuthEntry()?await")
@@ -84,15 +91,22 @@ function applyAuthenticatedProxyPatch(currentSource) {
     );
   }
 
-  const requestNeedle =
-    `let l=${electronVar}.net.request({method:n,url:i,headers:t}),u=-1,d=()=>{let e=l.getUploadProgress();!e.started||e.current===u||(u=e.current,r({loaded:e.current,total:e.total}))}`;
-  const requestReplacement =
-    `let l=${electronVar}.net.request({method:n,url:i,headers:t});codexLinuxAttachProxyAuthToRequest(l);let u=-1,d=()=>{if(r==null)return;let e=l.getUploadProgress();!e.started||e.current===u||(u=e.current,r({loaded:e.current,total:e.total}))}`;
-  if (patchedSource.includes(requestNeedle)) {
-    patchedSource = patchedSource.replace(requestNeedle, requestReplacement);
+  const requestReplacements = [
+    [
+      `let l=${electronVar}.net.request({method:n,url:i,headers:t}),u=-1,d=()=>{let e=l.getUploadProgress();!e.started||e.current===u||(u=e.current,r({loaded:e.current,total:e.total}))}`,
+      `let l=${electronVar}.net.request({method:n,url:i,headers:t});codexLinuxAttachProxyAuthToRequest(l);let u=-1,d=()=>{if(r==null)return;let e=l.getUploadProgress();!e.started||e.current===u||(u=e.current,r({loaded:e.current,total:e.total}))}`,
+    ],
+    [
+      `let u=${electronVar}.net.request({method:n,url:i,headers:t,useSessionCookies:s}),d=-1,f=()=>{let e=u.getUploadProgress();!e.started||e.current===d||(d=e.current,r({loaded:e.current,total:e.total}))}`,
+      `let u=${electronVar}.net.request({method:n,url:i,headers:t,useSessionCookies:s});codexLinuxAttachProxyAuthToRequest(u);let d=-1,f=()=>{if(r==null)return;let e=u.getUploadProgress();!e.started||e.current===d||(d=e.current,r({loaded:e.current,total:e.total}))}`,
+    ],
+  ];
+  const requestReplacement = requestReplacements.find(([needle]) => patchedSource.includes(needle));
+  if (requestReplacement != null) {
+    patchedSource = patchedSource.replace(requestReplacement[0], requestReplacement[1]);
   } else if (
     patchedSource.includes("performProgressRequest") &&
-    !patchedSource.includes("codexLinuxAttachProxyAuthToRequest(l)")
+    !patchedSource.includes("codexLinuxAttachProxyAuthToRequest(")
   ) {
     console.warn(
       "WARN: Could not attach Linux proxy authentication to ClientRequest fetch path",

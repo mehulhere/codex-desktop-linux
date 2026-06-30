@@ -27,6 +27,19 @@ function applyPatchTwice(patchFn, source) {
   return once;
 }
 
+function applyPatchTwiceWithoutWarnings(patchFn, source) {
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args.join(" "));
+  try {
+    const patched = applyPatchTwice(patchFn, source);
+    assert.deepEqual(warnings, []);
+    return patched;
+  } finally {
+    console.warn = originalWarn;
+  }
+}
+
 function withFeatureConfig(enabled, callback) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "authenticated-proxy-feature-"));
   const configPath = path.join(tempDir, "features.json");
@@ -189,7 +202,7 @@ test("registers Linux proxy authentication before Electron app ready", async () 
     "await n.app.whenReady();",
     "return A}",
   ].join("");
-  const patched = applyPatchTwice(applyAuthenticatedProxyPatch, source);
+  const patched = applyPatchTwiceWithoutWarnings(applyAuthenticatedProxyPatch, source);
 
   assert.match(patched, /function codexLinuxInstallProxyAuthHandler\(e\)/);
   assert.match(patched, /codexLinuxInstallProxyAuthHandler\(n\);await n\.app\.whenReady\(\)/);
@@ -272,7 +285,7 @@ test("routes authenticated proxy desktop fetches through ClientRequest login", a
     "}",
     "globalThis.Fetcher=Fetcher;",
   ].join("");
-  const patched = applyPatchTwice(applyAuthenticatedProxyPatch, source);
+  const patched = applyPatchTwiceWithoutWarnings(applyAuthenticatedProxyPatch, source);
 
   assert.match(patched, /function codexLinuxAttachProxyAuthToRequest\(e\)/);
   assert.match(patched, /i==null&&!codexLinuxProxyAuthEntry\(\)\?await a\.net\.fetch/);
@@ -362,4 +375,40 @@ test("routes authenticated proxy desktop fetches through ClientRequest login", a
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "request");
   assert.deepEqual(credentials, { username: "user", password: "p@ss" });
+});
+
+
+test("routes latest authenticated proxy desktop fetch shape through ClientRequest login", () => {
+  const source = [
+    "let a=require(`electron`);",
+    "async function boot(){await a.app.whenReady()}",
+    "class Fetcher{",
+    "async performDesktopFetch({body:e,headers:n,method:r,onUploadProgress:i,resolvedUrl:o,signal:s}){let p=()=>e,m=async e=>{let t=this.cloneHeaders(n);let d=i==null?await a.net.fetch(o,{method:r,headers:t,body:p(),signal:s,credentials:c?`include`:`same-origin`}):await this.performProgressRequest({body:p(),headers:t,method:r,onUploadProgress:i,resolvedUrl:o,signal:s,useSessionCookies:c});return d};return m({})}",
+    "performProgressRequest({body:e,headers:t,method:n,onUploadProgress:r,resolvedUrl:i,signal:o,useSessionCookies:s}){return new Promise((c,l)=>{let u=a.net.request({method:n,url:i,headers:t,useSessionCookies:s}),d=-1,f=()=>{let e=u.getUploadProgress();!e.started||e.current===d||(d=e.current,r({loaded:e.current,total:e.total}))};return u})}",
+    "cloneHeaders(e){return e}",
+    "}",
+  ].join("");
+  const patched = applyPatchTwiceWithoutWarnings(applyAuthenticatedProxyPatch, source);
+
+  assert.match(patched, /i==null&&!codexLinuxProxyAuthEntry\(\)\?await a\.net\.fetch\(o,\{method:r,headers:t,body:p\(\),signal:s,credentials:c\?`include`:`same-origin`\}/);
+  assert.match(
+    patched,
+    /let u=a\.net\.request\(\{method:n,url:i,headers:t,useSessionCookies:s\}\);codexLinuxAttachProxyAuthToRequest\(u\);let d=-1,f=\(\)=>\{if\(r==null\)return;/,
+  );
+});
+
+test("authenticated-proxy tests fail when current desktop fetch shape drifts", () => {
+  const source = [
+    "let a=require(`electron`);",
+    "async function boot(){await a.app.whenReady()}",
+    "class Fetcher{",
+    "async performDesktopFetch(){let d=await a.net.fetch(`https://example.test`,{})}",
+    "performProgressRequest(){let u=a.net.request({url:`https://example.test`})}",
+    "}",
+  ].join("");
+
+  assert.throws(
+    () => applyPatchTwiceWithoutWarnings(applyAuthenticatedProxyPatch, source),
+    /Could not route Linux proxy-auth desktop fetches through ClientRequest|Expected values to be strictly deep-equal/,
+  );
 });
