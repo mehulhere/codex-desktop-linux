@@ -4064,6 +4064,36 @@ EOF
     output="$(env -i PATH="$PATH" HOME="$HOME" WSL_INTEROP=/tmp/codex-wsl WAYLAND_DISPLAY=wayland-0 "$launcher_probe" probe)"
     [[ "$output" == *"mode=wslg"* && "$output" == *"wslg=1"* ]] || fail "auto rendering mode must detect WSLg from WSL and GUI markers: $output"
 
+    output="$(env -i PATH="$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default CODEX_OZONE_PLATFORM=x11 "$launcher_probe" probe)"
+    [[ "$output" == *"<--ozone-platform=x11>"* && "$output" != *"<--ozone-platform-hint=auto>"* ]] || fail "CODEX_OZONE_PLATFORM=x11 must select the X11 Ozone backend: $output"
+
+    output="$(env -i PATH="$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default CODEX_OZONE_PLATFORM=wayland "$launcher_probe" probe)"
+    [[ "$output" == *"<--ozone-platform=wayland>"* && "$output" == *"WaylandWindowDecorations"* ]] || fail "CODEX_OZONE_PLATFORM=wayland must select native Wayland with decorations: $output"
+
+    output="$(env -i PATH="$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default CODEX_OZONE_PLATFORM=auto SOMMELIER_VERSION=1 "$launcher_probe" probe)"
+    [[ "$output" == *"<--ozone-platform-hint=auto>"* && "$output" != *"<--ozone-platform=x11>"* ]] || fail "CODEX_OZONE_PLATFORM=auto must override the Sommelier X11 fallback: $output"
+
+    output="$(env -i PATH="$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default CODEX_OZONE_PLATFORM=wayland "$launcher_probe" probe --x11)"
+    [[ "$output" == *"<--ozone-platform=x11>"* && "$output" != *"<--ozone-platform=wayland>"* ]] || fail "explicit --x11 must win over CODEX_OZONE_PLATFORM: $output"
+
+    output="$(env -i PATH="$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default CODEX_OZONE_PLATFORM=bogus "$launcher_probe" probe 2>/dev/null)"
+    [[ "$output" == *"<--ozone-platform-hint=auto>"* ]] || fail "invalid CODEX_OZONE_PLATFORM must fall back to the default ozone hint: $output"
+
+    output="$(env -i PATH="$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default CODEX_FORCE_DEVICE_SCALE_FACTOR=1 "$launcher_probe" probe)"
+    [[ "$output" == *"<--force-device-scale-factor=1>"* ]] || fail "CODEX_FORCE_DEVICE_SCALE_FACTOR=1 must pass the scale flag to Electron: $output"
+
+    output="$(env -i PATH="$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default CODEX_FORCE_DEVICE_SCALE_FACTOR=1.25 "$launcher_probe" probe)"
+    [[ "$output" == *"<--force-device-scale-factor=1.25>"* ]] || fail "fractional CODEX_FORCE_DEVICE_SCALE_FACTOR must pass through: $output"
+
+    output="$(env -i PATH="$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default CODEX_FORCE_DEVICE_SCALE_FACTOR=abc "$launcher_probe" probe 2>/dev/null)"
+    [[ "$output" != *"--force-device-scale-factor"* ]] || fail "invalid CODEX_FORCE_DEVICE_SCALE_FACTOR must be ignored: $output"
+
+    output="$(env -i PATH="$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default CODEX_FORCE_DEVICE_SCALE_FACTOR=0 "$launcher_probe" probe 2>/dev/null)"
+    [[ "$output" != *"--force-device-scale-factor"* ]] || fail "zero CODEX_FORCE_DEVICE_SCALE_FACTOR must be ignored: $output"
+
+    output="$(env -i PATH="$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default CODEX_FORCE_DEVICE_SCALE_FACTOR=1 "$launcher_probe" probe -- --force-device-scale-factor=2)"
+    [[ "$output" == *"electron=<--force-device-scale-factor=2>"* && "$output" != *"<--force-device-scale-factor=1>"* ]] || fail "explicit --force-device-scale-factor must win over the env override: $output"
+
     assert_contains "$REPO_DIR/launcher/start.sh.template" "warm_start_ipc_sent"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "launcher_phase"
     assert_contains "$REPO_DIR/launcher/start.sh.template" 'date +%s%N'
@@ -4095,6 +4125,10 @@ EOF
     assert_contains "$REPO_DIR/launcher/start.sh.template" "--disable-gpu-sandbox"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "--force-renderer-accessibility"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "CODEX_FORCE_RENDERER_ACCESSIBILITY=auto|0|1"
+    assert_contains "$REPO_DIR/launcher/start.sh.template" "CODEX_OZONE_PLATFORM=x11|wayland|auto"
+    assert_contains "$REPO_DIR/launcher/start.sh.template" "CODEX_FORCE_DEVICE_SCALE_FACTOR=N"
+    assert_contains "$REPO_DIR/launcher/start.sh.template" "print_scaling_diagnostics"
+    assert_contains "$REPO_DIR/launcher/start.sh.template" "--diagnose-scaling"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "PACKAGED_RUNTIME_HELPER"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "--allow-install-missing"
     assert_contains "$REPO_DIR/scripts/lib/process-detection.sh" "CODEX_INSTALL_ALLOW_RUNNING"
