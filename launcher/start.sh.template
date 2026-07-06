@@ -2791,29 +2791,27 @@ assistive_technology_detected() {
 # AT-SPI state that `codex-computer-use-linux setup` enables (org.a11y.Status
 # IsEnabled via busctl, with org.gnome.desktop.interface toolkit-accessibility
 # as its gsettings fallback). gsettings/busctl can hang on a broken session
-# bus, so the probes run in a subshell killed by the same ppid-guarded
-# watchdog webview_port_is_open uses (/usr/bin/timeout intentionally avoided;
-# see that function), capped at 0.5 s. A killed or failing probe counts as
-# "not detected" and never blocks launch.
-session_bus_assistive_technology_detected() {
-    local probe_pid kill_pid rc=1 self_pid=$$
+# bus, so each external helper runs under a watchdog capped at 0.5 s. When
+# setsid is available the watchdog kills the helper process group, which keeps
+# shell stubs and helper descendants from surviving launch. A killed or failing
+# probe counts as "not detected" and never blocks launch.
+SESSION_BUS_PROBE_OUTPUT=""
 
-    ( trap - EXIT
-      if command -v gsettings >/dev/null 2>&1; then
-          case "$(gsettings get org.gnome.desktop.a11y.applications screen-reader-enabled 2>/dev/null || true)" in
-              true) exit 0 ;;
-          esac
-          case "$(gsettings get org.gnome.desktop.interface toolkit-accessibility 2>/dev/null || true)" in
-              true) exit 0 ;;
-          esac
-      fi
-      if command -v busctl >/dev/null 2>&1; then
-          case "$(busctl --user get-property org.a11y.Bus /org/a11y/bus org.a11y.Status IsEnabled 2>/dev/null || true)" in
-              "b true") exit 0 ;;
-          esac
-      fi
-      exit 1 ) 2>/dev/null &
+session_bus_probe_command() {
+    local output_file probe_pid kill_pid rc=1 self_pid use_process_group=0
+
+    SESSION_BUS_PROBE_OUTPUT=""
+    output_file="$(mktemp "${TMPDIR:-/tmp}/codex-session-bus-probe.XXXXXX")" || return 1
+    self_pid=${BASHPID:-$$}
+
+    if command -v setsid >/dev/null 2>&1; then
+        setsid "$@" >"$output_file" 2>/dev/null &
+        use_process_group=1
+    else
+        "$@" >"$output_file" 2>/dev/null &
+    fi
     probe_pid=$!
+
     ( trap - EXIT
       sleep 0.5
       [ -r "/proc/$probe_pid/stat" ] || exit 0
@@ -2824,13 +2822,57 @@ session_bus_assistive_technology_detected() {
       rest=${stat_line##*) }
       set -- $rest
       # $1 = state, $2 = ppid
-      [ "${2:-}" = "$self_pid" ] && kill -9 "$probe_pid" 2>/dev/null
+      [ "${2:-}" = "$self_pid" ] || exit 0
+      if [ "$use_process_group" -eq 1 ]; then
+          kill -TERM "-$probe_pid" 2>/dev/null || kill -TERM "$probe_pid" 2>/dev/null || true
+          sleep 0.1
+          kill -KILL "-$probe_pid" 2>/dev/null || kill -KILL "$probe_pid" 2>/dev/null || true
+      else
+          kill -TERM "$probe_pid" 2>/dev/null || true
+          sleep 0.1
+          kill -KILL "$probe_pid" 2>/dev/null || true
+      fi
     ) 2>/dev/null &
     kill_pid=$!
-    if wait "$probe_pid" 2>/dev/null; then rc=0; fi
-    kill "$kill_pid" 2>/dev/null
-    wait "$kill_pid" 2>/dev/null
-    return $rc
+
+    if wait "$probe_pid" 2>/dev/null; then
+        rc=0
+    else
+        rc=$?
+    fi
+    kill "$kill_pid" 2>/dev/null || true
+    wait "$kill_pid" 2>/dev/null || true
+
+    if [ "$rc" -eq 0 ] && [ -r "$output_file" ]; then
+        SESSION_BUS_PROBE_OUTPUT="$(< "$output_file")"
+    fi
+    rm -f "$output_file"
+    return "$rc"
+}
+
+session_bus_assistive_technology_detected() {
+    if command -v gsettings >/dev/null 2>&1; then
+        if session_bus_probe_command gsettings get org.gnome.desktop.a11y.applications screen-reader-enabled; then
+            case "$SESSION_BUS_PROBE_OUTPUT" in
+                true) return 0 ;;
+            esac
+        fi
+        if session_bus_probe_command gsettings get org.gnome.desktop.interface toolkit-accessibility; then
+            case "$SESSION_BUS_PROBE_OUTPUT" in
+                true) return 0 ;;
+            esac
+        fi
+    fi
+
+    if command -v busctl >/dev/null 2>&1; then
+        if session_bus_probe_command busctl --user get-property org.a11y.Bus /org/a11y/bus org.a11y.Status IsEnabled; then
+            case "$SESSION_BUS_PROBE_OUTPUT" in
+                "b true") return 0 ;;
+            esac
+        fi
+    fi
+
+    return 1
 }
 
 should_force_renderer_accessibility() {

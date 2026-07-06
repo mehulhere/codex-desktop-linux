@@ -3956,6 +3956,10 @@ EOF
     # Hung session bus: gsettings blocks far past the launch-path budget.
     cat > "$at_stub_dir/slowbus/gsettings" <<'EOF'
 #!/usr/bin/env bash
+: "${CODEX_TEST_SLOWBUS_PID_FILE:=}"
+if [ -n "$CODEX_TEST_SLOWBUS_PID_FILE" ]; then
+    printf '%s\n' "$$" > "$CODEX_TEST_SLOWBUS_PID_FILE"
+fi
 sleep 5
 printf 'true\n'
 EOF
@@ -4103,13 +4107,21 @@ EOF
     output="$(env -i PATH="$at_stub_dir/atspibus:$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default "$launcher_probe" probe)"
     [[ "$output" == *"renderer_accessibility=1"* && "$output" == *"<--force-renderer-accessibility>"* ]] || fail "org.a11y.Status IsEnabled (Computer Use setup) must force renderer accessibility: $output"
 
-    local at_probe_start_ns at_probe_end_ns at_probe_elapsed_ms
+    local at_probe_start_ns at_probe_end_ns at_probe_elapsed_ms slowbus_pid slowbus_pid_file
+    slowbus_pid_file="$TMP_DIR/slowbus-gsettings.pid"
+    rm -f "$slowbus_pid_file"
     at_probe_start_ns="$(date +%s%N)"
-    output="$(env -i PATH="$at_stub_dir/slowbus:$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default "$launcher_probe" probe)"
+    output="$(env -i PATH="$at_stub_dir/slowbus:$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=default CODEX_TEST_SLOWBUS_PID_FILE="$slowbus_pid_file" "$launcher_probe" probe)"
     at_probe_end_ns="$(date +%s%N)"
     at_probe_elapsed_ms=$(( (10#$at_probe_end_ns - 10#$at_probe_start_ns) / 1000000 ))
     [[ "$output" == *"renderer_accessibility=0"* && "$output" != *"<--force-renderer-accessibility>"* ]] || fail "a hung session bus must not force renderer accessibility: $output"
     [ "$at_probe_elapsed_ms" -lt 3000 ] || fail "session-bus assistive-tech probe must be watchdog-capped, took ${at_probe_elapsed_ms}ms: $output"
+    [ -s "$slowbus_pid_file" ] || fail "hung session-bus probe did not start the gsettings helper"
+    slowbus_pid="$(< "$slowbus_pid_file")"
+    if kill -0 "$slowbus_pid" 2>/dev/null; then
+        kill -KILL "$slowbus_pid" 2>/dev/null || true
+        fail "session-bus assistive-tech watchdog leaked hung gsettings pid $slowbus_pid"
+    fi
 
     output="$(env -i PATH="$PATH" HOME="$HOME" CODEX_LINUX_RENDERING_MODE=wslg "$launcher_probe" probe --wayland --use-gl=desktop)"
     [[ "$output" == *"<--ozone-platform=wayland>"* && "$output" == *"electron=<--use-gl=desktop>"* ]] || fail "explicit rendering args must override WSLg defaults: $output"
@@ -4301,6 +4313,7 @@ EOF
     assert_contains "$REPO_DIR/launcher/start.sh.template" "--force-renderer-accessibility"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "CODEX_FORCE_RENDERER_ACCESSIBILITY=auto|0|1"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "assistive_technology_detected"
+    assert_contains "$REPO_DIR/launcher/start.sh.template" "session_bus_probe_command"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "CODEX_OZONE_PLATFORM=x11|wayland|auto"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "CODEX_FORCE_DEVICE_SCALE_FACTOR=N"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "print_scaling_diagnostics"
