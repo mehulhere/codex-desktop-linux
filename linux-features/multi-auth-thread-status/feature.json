@@ -1,0 +1,8 @@
+{
+  "id": "multi-auth-thread-status",
+  "name": "Multi-auth per-thread status",
+  "description": "Shows the routed codex-multi-auth account in each Desktop thread's status dialog.",
+  "entrypoints": {
+    "patchDescriptors": "./patch.js"
+  }
+}
