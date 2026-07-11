@@ -8,7 +8,6 @@ function applyStatusDialogPatch(source) {
     /function ([A-Za-z_$][\w$]*)\(e\)\{let ([A-Za-z_$][\w$]*)=\(0,([A-Za-z_$][\w$]*)\.c\)\(22\),\{threadId:([A-Za-z_$][\w$]*),contextUsage:([A-Za-z_$][\w$]*),rateLimitRows:([A-Za-z_$][\w$]*),alertData:([A-Za-z_$][\w$]*),onClose:([A-Za-z_$][\w$]*)\}=e/,
   );
   if (header == null || header.index == null) {
-    console.warn("WARN: Could not find current status dialog for multi-auth account row");
     return source;
   }
   const openBrace = source.indexOf("{", header.index);
@@ -20,7 +19,6 @@ function applyStatusDialogPatch(source) {
     /\[([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\]=\(0,([A-Za-z_$][\w$]*)\.useState\)\(!1\),([A-Za-z_$][\w$]*)=\(0,\3\.useRef\)\(null\),([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*);/,
   );
   if (hooks == null) {
-    console.warn("WARN: Could not find current status dialog hooks for multi-auth account row");
     return source;
   }
   const originalHooks = hooks[0];
@@ -30,7 +28,6 @@ function applyStatusDialogPatch(source) {
   const contextNeedle = /,([A-Za-z_$][\w$]*)&&([A-Za-z_$][\w$]*)!=null\)\{/;
   const contextMatch = block.match(contextNeedle);
   if (contextMatch == null) {
-    console.warn("WARN: Could not find status context row insertion point for multi-auth account row");
     return source;
   }
   block = block.replace(

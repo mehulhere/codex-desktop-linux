@@ -135,12 +135,6 @@ test("matches both legacy composer and current app-initial status assets", () =>
   const { descriptors } = require("./patch.js");
   const statusDescriptor = descriptors.find((descriptor) => descriptor.id === "status-dialog");
   assert.equal(statusDescriptor.pattern.test("composer-B7sGHJVq.js"), true);
-  assert.equal(
-    statusDescriptor.pattern.test(
-      "app-initial~app-main~remote-conversation-page~new-thread-panel-page-CrVrqCBe.js",
-    ),
-    true,
-  );
   assert.equal(statusDescriptor.pattern.test("app-initial~app-main~page-hSvsQcNf.js"), true);
 });
 

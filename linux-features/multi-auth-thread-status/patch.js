@@ -58,7 +58,7 @@ module.exports = {
       phase: "webview-asset",
       order: 20_720,
       ciPolicy: "optional",
-      pattern: /^(?:composer-|app-initial~app-main~).*\.js$/,
+      pattern: /^(?:composer-|app-initial~app-main~page-).*\.js$/,
       missingDescription: "status dialog bundle",
       skipDescription: "multi-auth status account row patch",
       apply: applyStatusDialogPatch,
