@@ -141,6 +141,7 @@ test("matches both legacy composer and current app-initial status assets", () =>
     ),
     true,
   );
+  assert.equal(statusDescriptor.pattern.test("app-initial~app-main~page-hSvsQcNf.js"), true);
 });
 
 test("exposes all three patch phases only when the feature is enabled", () => {
