@@ -1,0 +1,8 @@
+{
+  "id": "composer-dictation",
+  "name": "Composer dictation",
+  "description": "Enable the standard Codex microphone button for message dictation on Linux.",
+  "entrypoints": {
+    "patchDescriptors": "./patch.js"
+  }
+}
