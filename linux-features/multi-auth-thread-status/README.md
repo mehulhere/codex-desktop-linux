@@ -5,6 +5,8 @@ the locally routed account to the current thread's `/status` dialog:
 
 ```text
 Account:  Account 4 (oc***@icloud.com)
+5h limit: 96% left (resets 09:42)
+7d limit: 99% left (resets 18 Jul)
 ```
 
 The feature reads the owner-only app-router status file through a narrow
@@ -31,6 +33,9 @@ is active and its persistent router writes
 ## Behavior
 
 - `/status` shows `Account N (masked email)` for the open thread.
+- The 5-hour and 7-day rows use that assigned account's redacted quota
+  windows, including percentage remaining and reset time. Native Desktop quota
+  rows remain the fallback when multi-auth has no valid quota snapshot.
 - Resuming or forking a task created under the native `openai` provider routes
   its next request through `codex-multi-auth-runtime-proxy`, so legacy tasks do
   not bypass quota rotation.
@@ -40,7 +45,6 @@ is active and its persistent router writes
   assignment storage is unavailable, the router is unavailable, or its status
   file is unavailable.
 - Malformed, stale, or untrusted status requests return no account data.
-- Existing 5-hour and 7-day quota rows remain owned by Codex Desktop.
 - Patch drift is fail-soft and reported during the Linux build.
 
 ## Test

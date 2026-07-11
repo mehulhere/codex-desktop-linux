@@ -172,9 +172,9 @@ test("patches main process and preload with a narrow IPC bridge", () => {
   assert.match(patchedPreload, /codex_linux:multi-auth-thread-status/);
 });
 
-test("adds the routed account row to the current status dialog", () => {
+test("adds the routed account and its quota rows to the current status dialog", () => {
   const source =
-    "function zg(e){let t=(0,$.c)(22),{threadId:n,contextUsage:r,rateLimitRows:i,alertData:a,onClose:o}=e,s=Ht(),c=r.percent!=null,l=0,u=[],d=(e,t,n)=>{u.push({label:e,value:t})},p=`Session:`,[m,h]=(0,Z.useState)(!1),g=(0,Z.useRef)(null),_,v;if((0,Z.useEffect)(_,v),n&&d(p,n),c&&l!=null){d(`Context:`,l)}return u}";
+    "function zg(e){let t=(0,$.c)(22),{threadId:n,contextUsage:r,rateLimitRows:i,alertData:a,onClose:o}=e,s=Ht(),c=r.percent!=null,l=0,u=[],d=(e,t,n)=>{u.push({label:e,value:t})},p=`Session:`,[m,h]=(0,Z.useState)(!1),g=(0,Z.useRef)(null),_,v;if((0,Z.useEffect)(_,v),n&&d(p,n),c&&l!=null){d(`Context:`,l)}let x=i.filter(cIe);if(x.length>0){d(`Rate limit:`,x.length)}return u}";
 
   const patched = applyTwice(applyStatusDialogPatch, source);
   assert.match(patched, /getMultiAuthThreadStatus/);
@@ -182,6 +182,11 @@ test("adds the routed account row to the current status dialog", () => {
   assert.match(patched, /Not assigned — status pending/);
   assert.match(patched, /accountDisplay/);
   assert.match(patched, /unassignedReason/);
+  assert.match(patched, /codexLinuxMultiAuthRateLimitRows/);
+  assert.match(patched, /windowDurationMins/);
+  assert.match(patched, /resetAtMs\/1e3/);
+  assert.match(patched, /codexLinuxMultiAuthRateLimitRows\.length/);
+  assert.match(patched, /i=codexLinuxMultiAuthRateLimitRows/);
 });
 
 test("routes legacy thread resume and fork through multi-auth", () => {
