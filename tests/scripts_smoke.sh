@@ -625,6 +625,9 @@ SCRIPT
     assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/scripts/lib/patch-browser-client-iab-socket-scope.js"
     assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/scripts/lib/node-runtime.sh"
     assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/scripts/lib/upstream-dmg-intel.js"
+    assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/scripts/lib/upstream-dmg-acceptance.js"
+    assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/scripts/lib/candidate-promotion.py"
+    assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/scripts/validate-upstream-dmg.js"
     assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/scripts/lib/linux-update-bridge-patch.js"
     assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/scripts/lib/patch-report.js"
     assert_file_exists "$pkg_root/opt/codex-desktop/update-builder/scripts/lib/rebuild-report.sh"
@@ -1689,7 +1692,6 @@ test_make_build_app_uses_installer_download_flow_by_default() {
     local workspace="$TMP_DIR/make-build-app"
     local install_log="$workspace/install-args.log"
     local first_line
-    local second_line
 
     mkdir -p "$workspace"
 
@@ -2407,19 +2409,346 @@ SCRIPT
     REBUILD_REPORT_DIR="$workspace/report" \
         bash "$repo/scripts/rebuild-candidate.sh" >"$workspace/default.out" 2>&1
     first_line="$(sed -n '1p' "$workspace/default.log")"
-    second_line="$(sed -n '2p' "$workspace/default.log")"
-    [[ "$first_line" != *"Codex.dmg"* ]] || fail "Default inspect should let installer validate the cache: $first_line"
-    [[ "$second_line" == *"<$repo/Codex.dmg>"* ]] || fail "Default build should pin the validated cache: $second_line"
-    assert_contains "$workspace/default.out" "Using validated DMG for build"
+    [ "$first_line" = "CALL:" ] || fail "Default rebuild should let the transactional installer validate its cache: $first_line"
 
     TEST_REBUILD_LOG="$workspace/explicit.log" \
     CODEX_NEXT_APP_DIR="$workspace/next-explicit" \
     REBUILD_REPORT_DIR="$workspace/report-explicit" \
         bash "$repo/scripts/rebuild-candidate.sh" "$explicit_dmg" >"$workspace/explicit.out" 2>&1
     first_line="$(sed -n '1p' "$workspace/explicit.log")"
-    second_line="$(sed -n '2p' "$workspace/explicit.log")"
-    [[ "$first_line" == *"<$explicit_realpath>"* ]] || fail "Explicit inspect should receive explicit DMG: $first_line"
-    [[ "$second_line" == *"<$explicit_realpath>"* ]] || fail "Explicit build should receive explicit DMG: $second_line"
+    [[ "$first_line" == *"<$explicit_realpath>"* ]] || fail "Explicit transactional build should receive explicit DMG: $first_line"
+}
+
+test_candidate_install_is_transactional() {
+    info "Checking atomic candidate promotion, first install, and rollback"
+    local workspace="$TMP_DIR/candidate-install"
+    mkdir -p "$workspace/final" "$workspace/candidate"
+    printf '%s' "old" >"$workspace/final/version"
+    printf '%s' "new" >"$workspace/candidate/version"
+
+    (
+        info() { :; }
+        warn() { :; }
+        error() { echo "$*" >&2; exit 1; }
+        assert_install_target_not_running() { :; }
+        INSTALL_DIR="$workspace/final"
+        # shellcheck source=scripts/lib/candidate-install.sh
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        promote_candidate_install "$workspace/candidate" "$workspace/final"
+        [ "$(cat "$workspace/final/version")" = "new" ] || fail "Expected accepted candidate to be promoted"
+        [ -n "$PROMOTED_BACKUP_APP_DIR" ] || fail "Expected previous app backup"
+        [ "$(cat "$PROMOTED_BACKUP_APP_DIR/version")" = "old" ] || fail "Expected backup to preserve previous app"
+    )
+
+    rm -rf "$workspace/final" "$workspace/candidate" "$workspace"/final.backup-* "$workspace"/.final.promotion.json
+    mkdir -p "$workspace/final" "$workspace/candidate"
+    printf '%s' "old" >"$workspace/final/version"
+    printf '%s' "new" >"$workspace/candidate/version"
+    (
+        info() { :; }
+        warn() { :; }
+        error() { echo "$*" >&2; exit 1; }
+        assert_install_target_not_running() { :; }
+        INSTALL_DIR="$workspace/final"
+        # shellcheck source=scripts/lib/candidate-install.sh
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        if CODEX_PROMOTION_TEST_FAIL_BACKUP_MOVE=1 \
+            promote_candidate_install "$workspace/candidate" "$workspace/final"; then
+            fail "Expected simulated backup move failure"
+        fi
+        [ "$(cat "$workspace/final/version")" = "old" ] || fail "Expected failed backup move to atomically restore previous app"
+        [ "$(cat "$workspace/candidate/version")" = "new" ] || fail "Expected rollback to preserve the accepted candidate"
+        [ ! -e "$workspace/.final.promotion.json" ] || fail "Expected rollback to remove the promotion journal"
+    )
+
+    rm -rf "$workspace/final" "$workspace/candidate" "$workspace"/final.backup-* "$workspace"/.final.promotion.json
+    mkdir -p "$workspace/final" "$workspace/candidate"
+    printf '%s' "old" >"$workspace/final/version"
+    printf '%s' "new" >"$workspace/candidate/version"
+    (
+        info() { :; }
+        warn() { :; }
+        error() { echo "$*" >&2; return 1; }
+        assert_install_target_not_running() { :; }
+        # shellcheck source=scripts/lib/candidate-install.sh
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        if CODEX_PROMOTION_TEST_FAIL_EXCHANGE=1 \
+            promote_candidate_install "$workspace/candidate" "$workspace/final"; then
+            fail "Expected simulated unsupported atomic exchange"
+        fi
+        [ "$(cat "$workspace/final/version")" = "old" ] || fail "Unsupported exchange changed the current app"
+        [ "$(cat "$workspace/candidate/version")" = "new" ] || fail "Unsupported exchange changed the candidate"
+    )
+
+    rm -rf "$workspace/final" "$workspace/candidate" "$workspace"/final.backup-* "$workspace"/.final.promotion.json
+    mkdir -p "$workspace/candidate"
+    printf '%s' "new" >"$workspace/candidate/version"
+    (
+        info() { :; }
+        warn() { :; }
+        error() { echo "$*" >&2; return 1; }
+        assert_install_target_not_running() { :; }
+        # shellcheck source=scripts/lib/candidate-install.sh
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        promote_candidate_install "$workspace/candidate" "$workspace/final"
+        [ "$(cat "$workspace/final/version")" = "new" ] || fail "Expected first install to use an atomic rename"
+        [ -z "$PROMOTED_BACKUP_APP_DIR" ] || fail "First install must not report a backup"
+    )
+}
+
+test_candidate_promotion_refuses_a_running_final_app() {
+    info "Checking user-local promotion cannot replace a running app"
+    local workspace="$TMP_DIR/candidate-running-app"
+    local electron_pid
+    mkdir -p "$workspace/final" "$workspace/candidate"
+    cp "$BASH" "$workspace/final/electron"
+    printf '%s' "old" >"$workspace/final/version"
+    printf '%s' "new" >"$workspace/candidate/version"
+    "$workspace/final/electron" --noprofile --norc -c \
+        'trap "exit 0" TERM INT; while :; do sleep 0.1; done' &
+    electron_pid=$!
+    while [ ! -e "/proc/$electron_pid/exe" ]; do sleep 0.01; done
+
+    (
+        info() { :; }
+        warn() { :; }
+        error() { echo "$*" >&2; return 1; }
+        CODEX_APP_ID="codex-desktop-test"
+        INSTALL_DIR="$workspace/final"
+        # shellcheck source=scripts/lib/process-detection.sh
+        . "$REPO_DIR/scripts/lib/process-detection.sh"
+        # shellcheck source=scripts/lib/candidate-install.sh
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        if promote_candidate_install "$workspace/candidate" "$workspace/final"; then
+            fail "Promotion unexpectedly replaced a running app"
+        fi
+    )
+    [ "$(cat "$workspace/final/version")" = "old" ] || fail "Running app promotion changed the final directory"
+    [ "$(cat "$workspace/candidate/version")" = "new" ] || fail "Running app promotion changed the candidate"
+    [ ! -e "$workspace/.final.promotion.json" ] || fail "Running app refusal must happen before journal creation"
+
+    kill "$electron_pid"
+    wait "$electron_pid" 2>/dev/null || true
+    (
+        info() { :; }
+        warn() { :; }
+        error() { echo "$*" >&2; exit 1; }
+        CODEX_APP_ID="codex-desktop-test"
+        INSTALL_DIR="$workspace/final"
+        . "$REPO_DIR/scripts/lib/process-detection.sh"
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        promote_candidate_install "$workspace/candidate" "$workspace/final"
+    )
+    [ "$(cat "$workspace/final/version")" = "new" ] || fail "Promotion did not succeed after the app exited"
+}
+
+test_candidate_backup_retention_is_bounded() {
+    info "Checking promotion retains only the immediate previous app backup"
+    local workspace="$TMP_DIR/candidate-backup-retention"
+    local managed_count=0
+    local path name suffix
+    mkdir -p "$workspace/final" "$workspace/candidate"
+    printf '%s' "v1" >"$workspace/final/version"
+    printf '%s' "v2" >"$workspace/candidate/version"
+
+    (
+        info() { :; }
+        warn() { :; }
+        error() { echo "$*" >&2; exit 1; }
+        assert_install_target_not_running() { :; }
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        promote_candidate_install "$workspace/candidate" "$workspace/final"
+    )
+
+    mkdir -p "$workspace/final.backup-20200101010101/nested" "$workspace/final.backup-manual"
+    printf '%s' "stale" >"$workspace/final.backup-20200101010101/version"
+    chmod 0555 "$workspace/final.backup-20200101010101" "$workspace/final.backup-20200101010101/nested"
+    printf '%s' "manual" >"$workspace/final.backup-20200101010103"
+    mkdir -p "$workspace/symlink-target"
+    ln -s "$workspace/symlink-target" "$workspace/final.backup-20200101010102"
+    mkdir -p "$workspace/candidate"
+    printf '%s' "v3" >"$workspace/candidate/version"
+
+    (
+        info() { :; }
+        warn() { :; }
+        error() { echo "$*" >&2; exit 1; }
+        assert_install_target_not_running() { :; }
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        promote_candidate_install "$workspace/candidate" "$workspace/final"
+    )
+
+    for path in "$workspace"/final.backup-*; do
+        [ -d "$path" ] || continue
+        [ ! -L "$path" ] || continue
+        name="$(basename "$path")"
+        suffix="${name#final.backup-}"
+        [[ "$suffix" =~ ^[0-9]{14}(-[1-9][0-9]*)?$ ]] || continue
+        managed_count=$((managed_count + 1))
+        [ "$(cat "$path/version")" = "v2" ] || fail "Retention kept a backup other than the immediate previous app"
+    done
+    [ "$managed_count" -eq 1 ] || fail "Expected exactly one managed app backup, found $managed_count"
+    [ -L "$workspace/final.backup-20200101010102" ] || fail "Managed cleanup removed an exact-name symlink"
+    [ -f "$workspace/final.backup-20200101010103" ] || fail "Managed cleanup removed an exact-name file"
+    [ -d "$workspace/final.backup-manual" ] || fail "Managed cleanup removed a manually named directory"
+}
+
+test_candidate_promotion_recovers_after_sigkill() {
+    info "Checking interrupted candidate promotion keeps the app available and recovers its backup"
+    local workspace="$TMP_DIR/candidate-promotion-interruption"
+    local pause_file="$workspace/exchanged"
+    local promotion_pid
+    local recovered_backup
+    mkdir -p "$workspace/final" "$workspace/candidate"
+    mkdir -p "$workspace/final.backup-20200101010101"
+    printf '%s' "stale" >"$workspace/final.backup-20200101010101/version"
+    printf '%s' "old" >"$workspace/final/version"
+    printf '%s' "new" >"$workspace/candidate/version"
+
+    (
+        info() { :; }
+        warn() { :; }
+        error() { echo "$*" >&2; exit 1; }
+        assert_install_target_not_running() { :; }
+        # shellcheck source=scripts/lib/candidate-install.sh
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        CODEX_PROMOTION_TEST_PAUSE_FILE="$pause_file" \
+            promote_candidate_install "$workspace/candidate" "$workspace/final"
+    ) &
+    promotion_pid=$!
+    while [ ! -e "$pause_file" ]; do
+        kill -0 "$promotion_pid" 2>/dev/null || fail "Promotion exited before the post-exchange pause"
+        sleep 0.01
+    done
+
+    [ "$(cat "$workspace/final/version")" = "new" ] || fail "Canonical app path disappeared or did not contain the accepted app"
+    kill -KILL "$promotion_pid"
+    wait "$promotion_pid" 2>/dev/null || true
+    [ "$(cat "$workspace/final/version")" = "new" ] || fail "SIGKILL left the canonical app unavailable"
+    [ -f "$workspace/.final.promotion.json" ] || fail "Expected durable recovery journal after SIGKILL"
+
+    (
+        info() { :; }
+        warn() { :; }
+        error() { echo "$*" >&2; exit 1; }
+        # shellcheck source=scripts/lib/candidate-install.sh
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        recover_pending_candidate_promotion "$workspace/final"
+    )
+    recovered_backup="$(find "$workspace" -maxdepth 1 -type d -name 'final.backup-*' -print -quit)"
+    [ -n "$recovered_backup" ] || fail "Expected interrupted promotion recovery to create the backup"
+    [ "$(cat "$recovered_backup/version")" = "old" ] || fail "Recovered backup did not preserve the previous app"
+    [ ! -e "$workspace/.final.promotion.json" ] || fail "Expected recovery to clear the promotion journal"
+    [ ! -e "$workspace/final/.codex-promotion-transaction" ] || fail "Expected recovery to clear the transaction marker"
+    [ "$(find "$workspace" -maxdepth 1 -type d -name 'final.backup-*' | wc -l)" -eq 1 ] \
+        || fail "Interrupted recovery must retain only the recovered previous app"
+}
+
+test_candidate_backup_cleanup_retries_after_failure() {
+    info "Checking backup cleanup failure is fail-soft and retried"
+    local workspace="$TMP_DIR/candidate-backup-cleanup-retry"
+    mkdir -p "$workspace/final" "$workspace/candidate" "$workspace/final.backup-20200101010101"
+    printf '%s' "v1" >"$workspace/final/version"
+    printf '%s' "v2" >"$workspace/candidate/version"
+    printf '%s' "stale" >"$workspace/final.backup-20200101010101/version"
+
+    (
+        info() { :; }
+        warn() { :; }
+        error() { echo "$*" >&2; exit 1; }
+        assert_install_target_not_running() { :; }
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        CODEX_PROMOTION_TEST_FAIL_BACKUP_CLEANUP=1 \
+            promote_candidate_install "$workspace/candidate" "$workspace/final"
+    )
+    [ "$(cat "$workspace/final/version")" = "v2" ] || fail "Cleanup failure rolled back the accepted app"
+    [ "$(find "$workspace" -maxdepth 1 -type d -name 'final.backup-*' | wc -l)" -gt 1 ] \
+        || fail "Simulated cleanup failure did not leave work for retry"
+
+    (
+        info() { :; }
+        warn() { :; }
+        error() { echo "$*" >&2; exit 1; }
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        recover_pending_candidate_promotion "$workspace/final"
+    )
+    [ "$(find "$workspace" -maxdepth 1 -type d -name 'final.backup-*' | wc -l)" -eq 1 ] \
+        || fail "Next recovery did not retry managed backup cleanup"
+}
+
+test_user_local_updates_preserve_the_running_app_gate() {
+    info "Checking automated user-local updates cannot inherit the running-app override"
+    assert_contains "$REPO_DIR/contrib/user-local-install/files/.local/bin/codex-desktop-update" "CODEX_INSTALL_ALLOW_RUNNING=0"
+    assert_not_contains "$REPO_DIR/contrib/user-local-install/files/.local/bin/codex-desktop-update" "CODEX_INSTALL_ALLOW_RUNNING=1"
+    assert_contains "$REPO_DIR/updater/src/wrapper_apply.rs" '.env("CODEX_INSTALL_ALLOW_RUNNING", "0")'
+    assert_not_contains "$REPO_DIR/updater/src/wrapper_apply.rs" '.env("CODEX_INSTALL_ALLOW_RUNNING", "1")'
+}
+
+test_candidate_promotion_is_serialized() {
+    info "Checking accepted candidate promotion is serialized per target"
+    local workspace="$TMP_DIR/candidate-promotion-lock"
+    local candidate="$workspace/candidate"
+    local final="$workspace/final"
+    local lock_file="$workspace/.final.promotion.lock"
+    local release_fifo="$workspace/release"
+    mkdir -p "$candidate"
+    printf '%s\n' "new" >"$candidate/version"
+    mkfifo "$release_fifo"
+
+    (
+        exec 8>"$lock_file"
+        flock 8
+        touch "$workspace/locked"
+        read -r _ <"$release_fifo"
+    ) &
+    local holder_pid=$!
+    while [ ! -f "$workspace/locked" ]; do sleep 0.01; done
+
+    (
+        error() { echo "[test][ERROR] $*" >&2; return 1; }
+        info() { :; }
+        warn() { :; }
+        assert_install_target_not_running() { :; }
+        # shellcheck source=scripts/lib/candidate-install.sh
+        . "$REPO_DIR/scripts/lib/candidate-install.sh"
+        promote_candidate_install "$candidate" "$final"
+    ) &
+    local promotion_pid=$!
+    sleep 0.1
+    [ -d "$candidate" ] || fail "Promotion advanced while another process held the target lock"
+    printf '%s\n' "release" >"$release_fifo"
+    wait "$holder_pid"
+    wait "$promotion_pid"
+    [ "$(cat "$final/version")" = "new" ] || fail "Serialized promotion did not install the candidate"
+}
+
+test_transactional_install_reenters_with_current_bash() {
+    info "Checking transactional install re-entry uses the active Bash binary"
+    assert_contains "$REPO_DIR/install.sh" '"\$BASH" "\$SCRIPT_DIR/install.sh" "\${original_args\[@\]}"'
+}
+
+test_transactional_install_uses_managed_node_and_isolated_reports() {
+    info "Checking transactional acceptance uses managed Node and isolated reports"
+    assert_contains "$REPO_DIR/install.sh" 'CODEX_ACCEPTANCE_NODE="\$CODEX_MANAGED_NODE_RUNTIME_DIR/bin/node"'
+    assert_contains "$REPO_DIR/install.sh" 'report_dir="\$report_base/transactions/\$transaction_id"'
+    assert_contains "$REPO_DIR/install.sh" '"\$CODEX_ACCEPTANCE_NODE" "\$SCRIPT_DIR/scripts/validate-upstream-dmg.js"'
+}
+
+test_installer_cleanup_handles_readonly_trees() {
+    info "Checking installer cleanup handles immutable-source directory modes"
+    local workspace="$TMP_DIR/readonly-installer-cleanup"
+    local work_dir="$workspace/work"
+    mkdir -p "$work_dir/runtime/lib"
+    printf '%s\n' "runtime" >"$work_dir/runtime/lib/node"
+    chmod 0555 "$work_dir" "$work_dir/runtime" "$work_dir/runtime/lib"
+    (
+        WORK_DIR="$work_dir"
+        # shellcheck source=scripts/lib/install-helpers.sh
+        . "$REPO_DIR/scripts/lib/install-helpers.sh"
+        cleanup
+        trap - EXIT ERR
+    )
+    [ ! -e "$work_dir" ] || fail "Expected cleanup to remove a read-only copied tree"
 }
 
 test_native_shortcut_targets_compose_existing_flows() {
@@ -8548,6 +8877,16 @@ main() {
     test_fresh_pinned_dmg_preserves_cached_dmg_metadata
     test_fresh_reuse_dmg_uses_cache_when_metadata_matches
     test_rebuild_candidate_uses_validated_default_dmg
+    test_candidate_install_is_transactional
+    test_candidate_promotion_refuses_a_running_final_app
+    test_candidate_backup_retention_is_bounded
+    test_candidate_promotion_recovers_after_sigkill
+    test_candidate_backup_cleanup_retries_after_failure
+    test_candidate_promotion_is_serialized
+    test_user_local_updates_preserve_the_running_app_gate
+    test_transactional_install_reenters_with_current_bash
+    test_transactional_install_uses_managed_node_and_isolated_reports
+    test_installer_cleanup_handles_readonly_trees
     test_native_shortcut_targets_compose_existing_flows
     test_fedora_dependency_bootstrap_installs_rpmbuild
     test_fedora_atomic_rpm_ostree_target_detection
