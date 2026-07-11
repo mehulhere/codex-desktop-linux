@@ -2,8 +2,6 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { requireName } = require("../../scripts/patches/lib/minified-js.js");
-
 const IPC_CHANNEL = "codex_linux:multi-auth-thread-status";
 const STATUS_FILE = "runtime-rotation-app-bind-status.json";
 const MAX_STATUS_AGE_MS = 30 * 60 * 1000;
@@ -60,29 +58,27 @@ function readThreadStatusFromFile(statusPath, sessionId, now = Date.now()) {
   }
 }
 
-function injectedMainSource({ electronVar, fsVar, pathVar }) {
+function injectedMainSource() {
   return [
+    `const codexLinuxMultiAuthElectron=require(\`electron\`),codexLinuxMultiAuthFs=require(\`node:fs\`),codexLinuxMultiAuthPath=require(\`node:path\`);`,
     `const codexLinuxMultiAuthStatusChannel=\`${IPC_CHANNEL}\`;`,
-    `function codexLinuxMultiAuthStatusPath(){let e=process.env.CODEX_MULTI_AUTH_DIR?.trim()||${pathVar}.join(process.env.HOME||${electronVar}.app.getPath(\`home\`),\`.codex\`,\`multi-auth\`);return ${pathVar}.join(e,\`app-bind\`,\`${STATUS_FILE}\`)}`,
+    `function codexLinuxMultiAuthStatusPath(){let e=process.env.CODEX_MULTI_AUTH_DIR?.trim()||codexLinuxMultiAuthPath.join(process.env.HOME||codexLinuxMultiAuthElectron.app.getPath(\`home\`),\`.codex\`,\`multi-auth\`);return codexLinuxMultiAuthPath.join(e,\`app-bind\`,\`${STATUS_FILE}\`)}`,
     `function codexLinuxMultiAuthStatusWindow(e){if(e==null||typeof e!==\`object\`||Array.isArray(e))return{};let t={};for(let n of[\`usedPercent\`,\`windowMinutes\`,\`resetAtMs\`])typeof e[n]===\`number\`&&Number.isFinite(e[n])&&(t[n]=e[n]);return t}`,
     `function codexLinuxMultiAuthThreadStatus(e,t=Date.now()){if(e==null||typeof e!==\`object\`||Array.isArray(e)||!Number.isInteger(e.accountNumber)||e.accountNumber<1||typeof e.accountDisplay!==\`string\`||e.accountDisplay.length>200||!e.accountDisplay.startsWith(\`Account \${e.accountNumber}\`))return null;if(e.maskedEmail!==null&&(typeof e.maskedEmail!==\`string\`||e.maskedEmail.length>160||!e.maskedEmail.includes(\`***@\`)||!e.accountDisplay.includes(e.maskedEmail)))return null;if(typeof e.updatedAt!==\`number\`||!Number.isFinite(e.updatedAt)||e.updatedAt<=0||t-e.updatedAt>${MAX_STATUS_AGE_MS}||e.updatedAt-t>6e4)return null;return{accountNumber:e.accountNumber,accountDisplay:e.accountDisplay,maskedEmail:e.maskedEmail,primary:codexLinuxMultiAuthStatusWindow(e.primary),secondary:codexLinuxMultiAuthStatusWindow(e.secondary),updatedAt:e.updatedAt}}`,
-    `function codexLinuxReadMultiAuthThreadStatus(e){if(typeof e!==\`string\`||!${SESSION_PATTERN.toString()}.test(e))return null;try{let t=JSON.parse(${fsVar}.readFileSync(codexLinuxMultiAuthStatusPath(),\`utf8\`));return codexLinuxMultiAuthThreadStatus(t?.threadStatuses?.[e])}catch{return null}}`,
+    `function codexLinuxReadMultiAuthThreadStatus(e){if(typeof e!==\`string\`||!${SESSION_PATTERN.toString()}.test(e))return null;try{let t=JSON.parse(codexLinuxMultiAuthFs.readFileSync(codexLinuxMultiAuthStatusPath(),\`utf8\`));return codexLinuxMultiAuthThreadStatus(t?.threadStatuses?.[e])}catch{return null}}`,
     `function codexLinuxMultiAuthTrustedStatusSender(e){let t=e?.senderFrame?.url??e?.sender?.getURL?.()??\`\`;return typeof t===\`string\`&&(t.startsWith(\`file://\`)||/^https?:\\/\\/(?:127\\.0\\.0\\.1|localhost)(?::\\d+)?(?:\\/|$)/.test(t))}`,
-    `${electronVar}.ipcMain.removeHandler?.(codexLinuxMultiAuthStatusChannel);${electronVar}.ipcMain.handle(codexLinuxMultiAuthStatusChannel,async(e,t)=>codexLinuxMultiAuthTrustedStatusSender(e)?codexLinuxReadMultiAuthThreadStatus(t):null);`,
+    `codexLinuxMultiAuthElectron.ipcMain.removeHandler?.(codexLinuxMultiAuthStatusChannel);codexLinuxMultiAuthElectron.ipcMain.handle(codexLinuxMultiAuthStatusChannel,async(e,t)=>codexLinuxMultiAuthTrustedStatusSender(e)?codexLinuxReadMultiAuthThreadStatus(t):null);`,
   ].join("");
 }
 
 function applyMainProcessPatch(source) {
   if (source.includes("codexLinuxReadMultiAuthThreadStatus")) return source;
-  const electronVar = requireName(source, "electron");
-  const fsVar = requireName(source, "node:fs");
-  const pathVar = requireName(source, "node:path");
   const marker = "exports.runMainAppStartup=";
-  if (electronVar == null || fsVar == null || pathVar == null || !source.includes(marker)) {
-    console.warn("WARN: Could not find main-process dependencies for multi-auth thread status");
+  if (!source.includes(marker)) {
+    console.warn("WARN: Could not find main-process startup export for multi-auth thread status");
     return source;
   }
-  return source.replace(marker, `${injectedMainSource({ electronVar, fsVar, pathVar })}${marker}`);
+  return source.replace(marker, `${injectedMainSource()}${marker}`);
 }
 
 function applyPreloadPatch(source) {

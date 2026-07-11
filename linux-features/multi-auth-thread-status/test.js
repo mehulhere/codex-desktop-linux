@@ -113,6 +113,7 @@ test("patches main process and preload with a narrow IPC bridge", () => {
   const patchedMain = applyTwice(applyMainProcessPatch, main);
   const patchedPreload = applyTwice(applyPreloadPatch, preload);
   assert.match(patchedMain, /codex_linux:multi-auth-thread-status/);
+  assert.match(patchedMain, /require\(`electron`\)/);
   assert.match(patchedMain, /runtime-rotation-app-bind-status\.json/);
   assert.match(patchedMain, /senderFrame/);
   assert.match(patchedPreload, /getMultiAuthThreadStatus/);
@@ -128,6 +129,18 @@ test("adds the routed account row to the current status dialog", () => {
   assert.match(patched, /Account:/);
   assert.match(patched, /Not assigned yet/);
   assert.match(patched, /accountDisplay/);
+});
+
+test("matches both legacy composer and current app-initial status assets", () => {
+  const { descriptors } = require("./patch.js");
+  const statusDescriptor = descriptors.find((descriptor) => descriptor.id === "status-dialog");
+  assert.equal(statusDescriptor.pattern.test("composer-B7sGHJVq.js"), true);
+  assert.equal(
+    statusDescriptor.pattern.test(
+      "app-initial~app-main~remote-conversation-page~new-thread-panel-page-CrVrqCBe.js",
+    ),
+    true,
+  );
 });
 
 test("exposes all three patch phases only when the feature is enabled", () => {
