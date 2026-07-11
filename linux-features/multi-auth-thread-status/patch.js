@@ -7,6 +7,7 @@ const {
   applyPreloadPatch,
 } = require("./main-process.js");
 const { applyStatusDialogPatch } = require("./webview.js");
+const { applyMultiAuthThreadRoutingPatch } = require("./routing.js");
 
 function applyPreloadExtractedAppPatch(extractedDir) {
   const buildDir = path.join(extractedDir, ".vite", "build");
@@ -52,6 +53,16 @@ module.exports = {
             : "skipped-optional",
         reason: result?.reason ?? warnings[0] ?? null,
       }),
+    },
+    {
+      id: "legacy-thread-routing",
+      phase: "webview-asset",
+      order: 20_715,
+      ciPolicy: "optional",
+      pattern: /^app-initial.*\.js$/,
+      missingDescription: "thread resume and fork bundle",
+      skipDescription: "multi-auth legacy thread routing patch",
+      apply: applyMultiAuthThreadRoutingPatch,
     },
     {
       id: "status-dialog",

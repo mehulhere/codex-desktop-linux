@@ -13,6 +13,7 @@ const {
   readThreadStatusResultFromFile,
 } = require("./main-process.js");
 const { applyStatusDialogPatch } = require("./webview.js");
+const { applyMultiAuthThreadRoutingPatch } = require("./routing.js");
 const {
   loadLinuxFeaturePatchDescriptors,
 } = require("../../scripts/lib/linux-features.js");
@@ -133,7 +134,16 @@ test("keeps durable assignments and explains missing assignments", () => {
     );
     assert.equal(
       readThreadStatusResultFromFile(statusPath, "missing", now).unassignedReason,
-      "Not assigned — no routed request from this task has reached multi-auth yet",
+      "Not assigned — no current multi-auth assignment record",
+    );
+
+    fs.writeFileSync(
+      statusPath,
+      JSON.stringify({ state: "running", threadStatusPersistence: "error", threadStatuses: {} }),
+    );
+    assert.equal(
+      readThreadStatusResultFromFile(statusPath, "missing", now).unassignedReason,
+      "Not assigned — multi-auth assignment storage is unavailable",
     );
 
     fs.writeFileSync(statusPath, JSON.stringify({ state: "error", threadStatuses: {} }));
@@ -174,6 +184,23 @@ test("adds the routed account row to the current status dialog", () => {
   assert.match(patched, /unassignedReason/);
 });
 
+test("routes legacy thread resume and fork through multi-auth", () => {
+  const source = [
+    "F=e.sendRequest(`thread/resume`,{threadId:t,history:null,modelProvider:P.modelProvider,serviceTier:P.serviceTier,cwd:P.cwd})",
+    "v=await e.sendRequest(`thread/fork`,{threadId:t,path:n??null,cwd:r,threadSource:m,model:u??void 0,config:_})",
+  ].join(";");
+
+  const patched = applyTwice(applyMultiAuthThreadRoutingPatch, source);
+  assert.match(
+    patched,
+    /modelProvider:P\.modelProvider\?\?`codex-multi-auth-runtime-proxy`/,
+  );
+  assert.match(
+    patched,
+    /thread\/fork`,\{threadId:t,modelProvider:`codex-multi-auth-runtime-proxy`,path:/,
+  );
+});
+
 test("matches both legacy composer and current app-initial status assets", () => {
   const { descriptors } = require("./patch.js");
   const statusDescriptor = descriptors.find((descriptor) => descriptor.id === "status-dialog");
@@ -200,7 +227,7 @@ test("exposes all three patch phases only when the feature is enabled", () => {
     });
     assert.deepEqual(
       descriptors.map((descriptor) => descriptor.phase),
-      ["main-bundle", "extracted-app:post-webview", "webview-asset"],
+      ["main-bundle", "extracted-app:post-webview", "webview-asset", "webview-asset"],
     );
   } finally {
     if (previous == null) delete process.env.CODEX_LINUX_FEATURES_CONFIG;

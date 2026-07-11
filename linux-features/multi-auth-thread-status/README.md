@@ -31,10 +31,14 @@ is active and its persistent router writes
 ## Behavior
 
 - `/status` shows `Account N (masked email)` for the open thread.
+- Resuming or forking a task created under the native `openai` provider routes
+  its next request through `codex-multi-auth-runtime-proxy`, so legacy tasks do
+  not bypass quota rotation.
 - A routed thread is assigned as soon as the router selects a usable account,
   and that redacted assignment survives router restarts for up to 90 days.
-- A thread with no assignment explains why: no routed request has reached
-  multi-auth yet, the router is unavailable, or its status file is unavailable.
+- A thread with no assignment explains why: no current assignment record exists,
+  assignment storage is unavailable, the router is unavailable, or its status
+  file is unavailable.
 - Malformed, stale, or untrusted status requests return no account data.
 - Existing 5-hour and 7-day quota rows remain owned by Codex Desktop.
 - Patch drift is fail-soft and reported during the Linux build.
