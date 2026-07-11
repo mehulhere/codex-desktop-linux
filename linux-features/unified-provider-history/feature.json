@@ -1,0 +1,9 @@
+{
+  "id": "unified-provider-history",
+  "name": "Unified provider history",
+  "description": "Shows native OpenAI and custom-provider Codex threads in one Desktop history list.",
+  "entrypoints": {
+    "patchDescriptors": "./patch.js"
+  }
+}
+
