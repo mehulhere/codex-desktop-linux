@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const IPC_CHANNEL = "codex_linux:multi-auth-thread-status";
 const STATUS_FILE = "runtime-rotation-app-bind-status.json";
-const MAX_STATUS_AGE_MS = 30 * 60 * 1000;
+const MAX_STATUS_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 const SESSION_PATTERN = /^[A-Za-z0-9._:-]{1,256}$/;
 
 function sanitizeWindow(value) {
@@ -58,6 +58,23 @@ function readThreadStatusFromFile(statusPath, sessionId, now = Date.now()) {
   }
 }
 
+function readThreadStatusResultFromFile(statusPath, sessionId, now = Date.now()) {
+  if (!SESSION_PATTERN.test(sessionId ?? "")) return null;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(statusPath, "utf8"));
+    const status = sanitizeThreadStatus(parsed?.threadStatuses?.[sessionId], now);
+    if (status) return status;
+    return {
+      unassignedReason:
+        parsed?.state === "running"
+          ? "Not assigned — no routed request from this task has reached multi-auth yet"
+          : "Not assigned — multi-auth router is unavailable",
+    };
+  } catch {
+    return { unassignedReason: "Not assigned — multi-auth status is unavailable" };
+  }
+}
+
 function injectedMainSource() {
   return [
     `const codexLinuxMultiAuthElectron=require(\`electron\`),codexLinuxMultiAuthFs=require(\`node:fs\`),codexLinuxMultiAuthPath=require(\`node:path\`);`,
@@ -65,7 +82,7 @@ function injectedMainSource() {
     `function codexLinuxMultiAuthStatusPath(){let e=process.env.CODEX_MULTI_AUTH_DIR?.trim()||codexLinuxMultiAuthPath.join(process.env.HOME||codexLinuxMultiAuthElectron.app.getPath(\`home\`),\`.codex\`,\`multi-auth\`);return codexLinuxMultiAuthPath.join(e,\`app-bind\`,\`${STATUS_FILE}\`)}`,
     `function codexLinuxMultiAuthStatusWindow(e){if(e==null||typeof e!==\`object\`||Array.isArray(e))return{};let t={};for(let n of[\`usedPercent\`,\`windowMinutes\`,\`resetAtMs\`])typeof e[n]===\`number\`&&Number.isFinite(e[n])&&(t[n]=e[n]);return t}`,
     `function codexLinuxMultiAuthThreadStatus(e,t=Date.now()){if(e==null||typeof e!==\`object\`||Array.isArray(e)||!Number.isInteger(e.accountNumber)||e.accountNumber<1||typeof e.accountDisplay!==\`string\`||e.accountDisplay.length>200||!e.accountDisplay.startsWith(\`Account \${e.accountNumber}\`))return null;if(e.maskedEmail!==null&&(typeof e.maskedEmail!==\`string\`||e.maskedEmail.length>160||!e.maskedEmail.includes(\`***@\`)||!e.accountDisplay.includes(e.maskedEmail)))return null;if(typeof e.updatedAt!==\`number\`||!Number.isFinite(e.updatedAt)||e.updatedAt<=0||t-e.updatedAt>${MAX_STATUS_AGE_MS}||e.updatedAt-t>6e4)return null;return{accountNumber:e.accountNumber,accountDisplay:e.accountDisplay,maskedEmail:e.maskedEmail,primary:codexLinuxMultiAuthStatusWindow(e.primary),secondary:codexLinuxMultiAuthStatusWindow(e.secondary),updatedAt:e.updatedAt}}`,
-    `function codexLinuxReadMultiAuthThreadStatus(e){if(typeof e!==\`string\`||!${SESSION_PATTERN.toString()}.test(e))return null;try{let t=JSON.parse(codexLinuxMultiAuthFs.readFileSync(codexLinuxMultiAuthStatusPath(),\`utf8\`));return codexLinuxMultiAuthThreadStatus(t?.threadStatuses?.[e])}catch{return null}}`,
+    `function codexLinuxReadMultiAuthThreadStatus(e){if(typeof e!==\`string\`||!${SESSION_PATTERN.toString()}.test(e))return null;try{let t=JSON.parse(codexLinuxMultiAuthFs.readFileSync(codexLinuxMultiAuthStatusPath(),\`utf8\`)),n=codexLinuxMultiAuthThreadStatus(t?.threadStatuses?.[e]);return n??{unassignedReason:t?.state===\`running\`?\`Not assigned — no routed request from this task has reached multi-auth yet\`:\`Not assigned — multi-auth router is unavailable\`}}catch{return{unassignedReason:\`Not assigned — multi-auth status is unavailable\`}}}`,
     `function codexLinuxMultiAuthTrustedStatusSender(e){let t=e?.senderFrame?.url??e?.sender?.getURL?.()??\`\`;return typeof t===\`string\`&&(t.startsWith(\`file://\`)||/^https?:\\/\\/(?:127\\.0\\.0\\.1|localhost)(?::\\d+)?(?:\\/|$)/.test(t))}`,
     `codexLinuxMultiAuthElectron.ipcMain.removeHandler?.(codexLinuxMultiAuthStatusChannel);codexLinuxMultiAuthElectron.ipcMain.handle(codexLinuxMultiAuthStatusChannel,async(e,t)=>codexLinuxMultiAuthTrustedStatusSender(e)?codexLinuxReadMultiAuthThreadStatus(t):null);`,
   ].join("");
@@ -100,5 +117,6 @@ module.exports = {
   applyMainProcessPatch,
   applyPreloadPatch,
   readThreadStatusFromFile,
+  readThreadStatusResultFromFile,
   sanitizeThreadStatus,
 };

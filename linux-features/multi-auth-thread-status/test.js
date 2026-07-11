@@ -10,6 +10,7 @@ const {
   applyMainProcessPatch,
   applyPreloadPatch,
   readThreadStatusFromFile,
+  readThreadStatusResultFromFile,
 } = require("./main-process.js");
 const { applyStatusDialogPatch } = require("./webview.js");
 const {
@@ -104,6 +105,47 @@ test("rejects stale and malformed sidecar entries", () => {
   }
 });
 
+test("keeps durable assignments and explains missing assignments", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-multi-auth-status-"));
+  try {
+    const statusPath = path.join(root, "status.json");
+    const now = Date.now();
+    fs.writeFileSync(
+      statusPath,
+      JSON.stringify({
+        state: "running",
+        threadStatuses: {
+          durable: {
+            accountNumber: 4,
+            accountDisplay: "Account 4 (oc***@icloud.com)",
+            maskedEmail: "oc***@icloud.com",
+            primary: {},
+            secondary: {},
+            updatedAt: now - 24 * 60 * 60_000,
+          },
+        },
+      }),
+    );
+
+    assert.equal(
+      readThreadStatusResultFromFile(statusPath, "durable", now).accountDisplay,
+      "Account 4 (oc***@icloud.com)",
+    );
+    assert.equal(
+      readThreadStatusResultFromFile(statusPath, "missing", now).unassignedReason,
+      "Not assigned — no routed request from this task has reached multi-auth yet",
+    );
+
+    fs.writeFileSync(statusPath, JSON.stringify({ state: "error", threadStatuses: {} }));
+    assert.equal(
+      readThreadStatusResultFromFile(statusPath, "missing", now).unassignedReason,
+      "Not assigned — multi-auth router is unavailable",
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("patches main process and preload with a narrow IPC bridge", () => {
   const main =
     "let e=require(`electron`),f=require(`node:fs`),p=require(`node:path`);function start(){}exports.runMainAppStartup=start;";
@@ -127,8 +169,9 @@ test("adds the routed account row to the current status dialog", () => {
   const patched = applyTwice(applyStatusDialogPatch, source);
   assert.match(patched, /getMultiAuthThreadStatus/);
   assert.match(patched, /Account:/);
-  assert.match(patched, /Not assigned yet/);
+  assert.match(patched, /Not assigned — status pending/);
   assert.match(patched, /accountDisplay/);
+  assert.match(patched, /unassignedReason/);
 });
 
 test("matches both legacy composer and current app-initial status assets", () => {

@@ -32,7 +32,7 @@ function applyStatusDialogPatch(source) {
   }
   block = block.replace(
     contextMatch[0],
-    `,d(\`Account:\`,codexLinuxMultiAuthThreadStatus?.accountDisplay??\`Not assigned yet\`)${contextMatch[0]}`,
+    `,d(\`Account:\`,codexLinuxMultiAuthThreadStatus?.accountDisplay??codexLinuxMultiAuthThreadStatus?.unassignedReason??\`Not assigned — status pending\`)${contextMatch[0]}`,
   );
   return source.slice(0, header.index) + block + source.slice(closeBrace + 1);
 }
