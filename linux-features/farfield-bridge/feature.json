@@ -1,0 +1,8 @@
+{
+  "id": "farfield-bridge",
+  "name": "Farfield bridge",
+  "description": "Lets an authenticated Farfield follower open Desktop's native temporary side task.",
+  "entrypoints": {
+    "patchDescriptors": "./patch.js"
+  }
+}
