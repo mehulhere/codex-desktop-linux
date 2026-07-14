@@ -51,6 +51,12 @@ assert_contains() {
     grep -q -- "$pattern" "$path" || fail "Expected '$pattern' in $path"
 }
 
+assert_contains_literal() {
+    local path="$1"
+    local text="$2"
+    grep -Fq -- "$text" "$path" || fail "Expected '$text' in $path"
+}
+
 assert_not_contains() {
     local path="$1"
     local pattern="$2"
@@ -4406,6 +4412,7 @@ EOF
     assert_contains "$REPO_DIR/launcher/start.sh.template" "CODEX_WEBVIEW_PORT"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "CODEX_LINUX_PIN_RENDERER_URL"
     assert_contains "$REPO_DIR/launcher/start.sh.template" "CODEX_LINUX_ALLOW_RENDERER_URL_OVERRIDE"
+    assert_contains_literal "$REPO_DIR/launcher/start.sh.template" 'if [ "$MULTI_LAUNCH_ACTIVE" -eq 1 ] ||'
     assert_contains "$REPO_DIR/launcher/start.sh.template" 'export ELECTRON_RENDERER_URL="$WEBVIEW_ORIGIN/"'
     assert_contains "$REPO_DIR/launcher/start.sh.template" 'ELECTRON_RENDERER_URL="${ELECTRON_RENDERER_URL:-$WEBVIEW_ORIGIN/}"'
     assert_contains "$REPO_DIR/launcher/start.sh.template" '--app-id="$CODEX_LINUX_APP_ID"'

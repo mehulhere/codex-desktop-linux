@@ -1,7 +1,7 @@
 {
   "id": "farfield-bridge",
   "name": "Farfield bridge",
-  "description": "Lets an authenticated Farfield follower open Desktop's native temporary side task.",
+  "description": "Adds acknowledged native composer takeover, queue, shared draft, and temporary side-task requests for Farfield.",
   "entrypoints": {
     "patchDescriptors": "./patch.js"
   }

@@ -19,6 +19,18 @@ process.env.CODEX_LINUX_FEATURES_CONFIG = path.join(
   "features.example.json",
 );
 
+test("multi-launch pins the renderer URL to its selected webview port", () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, "..", "launcher", "start.sh.template"),
+    "utf8",
+  );
+
+  assert.match(
+    source,
+    /if \[ "\$MULTI_LAUNCH_ACTIVE" -eq 1 \] \|\| \{ truthy_env_value "\$\{CODEX_LINUX_PIN_RENDERER_URL:-\}"/,
+  );
+});
+
 const {
   applyAutomationScheduleMultiTimePatch,
   patchAutomationScheduleAssets,
