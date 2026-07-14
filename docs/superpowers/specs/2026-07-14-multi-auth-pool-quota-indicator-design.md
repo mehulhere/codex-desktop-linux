@@ -88,9 +88,10 @@ than the only signal. Missing or stale data displays an em dash and an
 unavailable explanation; it is never displayed as zero.
 
 The renderer receives only the sanitized aggregate through the feature's
-existing narrow main-process/preload IPC bridge. It polls the local snapshot at
-a modest interval and when the window regains focus. Desktop never starts live
-quota probes.
+existing narrow main-process/preload IPC bridge. A preload-owned DOM control is
+mounted beside the top-right layout controls, avoiding a fragile dependency on
+minified React component names. It polls the local snapshot every 60 seconds and
+when the window regains focus. Desktop never starts live quota probes.
 
 ## Freshness And Failure Handling
 

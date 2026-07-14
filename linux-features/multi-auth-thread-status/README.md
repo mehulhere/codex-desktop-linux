@@ -1,12 +1,16 @@
 # Multi-auth Per-thread Status
 
 Opt-in integration for `codex-multi-auth` quota-aware Desktop routing. It adds
-the locally routed account to the current thread's `/status` dialog:
+the locally routed account to the current thread's `/status` dialog and a
+pool-wide indicator beside the top-right layout controls:
 
 ```text
 Account:  Account 4 (oc***@icloud.com)
 5h limit: 96% left (resets 09:42)
 7d limit: 99% left (resets 18 Jul)
+
+Top-right circle: 25
+Hover card: 176% total | 25% average across 7 accounts
 ```
 
 The feature reads the owner-only app-router status file through a narrow
@@ -33,6 +37,11 @@ is active and its persistent router writes
 ## Behavior
 
 - `/status` shows `Account N (masked email)` for the open thread.
+- The top-right circle shows the rounded combined 7-day average. Hovering or
+  keyboard-focusing it shows pool totals and averages for both windows.
+- Missing 5-hour data reads `Unavailable`; it is never treated as zero. The
+  local status snapshot refreshes on focus and every 60 seconds without
+  launching live quota probes from Desktop.
 - The 5-hour and 7-day rows use that assigned account's redacted quota
   windows, including percentage remaining and reset time. Native Desktop quota
   rows remain the fallback when multi-auth has no valid quota snapshot.
@@ -45,7 +54,12 @@ is active and its persistent router writes
   assignment storage is unavailable, the router is unavailable, or its status
   file is unavailable.
 - Malformed, stale, or untrusted status requests return no account data.
+- The pool IPC response contains aggregate counts and percentages only. The
+  renderer never receives the account pool, IDs, emails, or tokens.
 - Patch drift is fail-soft and reported during the Linux build.
+- The indicator is part of this source feature, so future DMG rebuilds reapply
+  it through `linux-features/features.json`; generated `app.asar` files are not
+  the durable source.
 
 ## Test
 

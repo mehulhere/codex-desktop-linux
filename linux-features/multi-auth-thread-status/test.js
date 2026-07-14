@@ -9,8 +9,10 @@ const test = require("node:test");
 const {
   applyMainProcessPatch,
   applyPreloadPatch,
+  readPoolStatusFromFile,
   readThreadStatusFromFile,
   readThreadStatusResultFromFile,
+  sanitizePoolStatus,
 } = require("./main-process.js");
 const { applyStatusDialogPatch } = require("./webview.js");
 const { applyMultiAuthThreadRoutingPatch } = require("./routing.js");
@@ -156,6 +158,47 @@ test("keeps durable assignments and explains missing assignments", () => {
   }
 });
 
+test("reads only a fresh redacted combined quota summary", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-multi-auth-pool-"));
+  try {
+    const statusPath = path.join(root, "status.json");
+    const now = Date.now();
+    const poolQuota = {
+      accountCount: 7,
+      fiveHour: null,
+      sevenDay: {
+        windowMinutes: 10_080,
+        reportedCount: 7,
+        totalRemainingPercent: 176,
+        averageRemainingPercent: 176 / 7,
+      },
+      updatedAt: now,
+      secretEmail: "must-not-leak@example.com",
+    };
+    fs.writeFileSync(statusPath, JSON.stringify({ poolQuota }));
+
+    assert.deepEqual(readPoolStatusFromFile(statusPath, now), {
+      accountCount: 7,
+      fiveHour: null,
+      sevenDay: {
+        windowMinutes: 10_080,
+        reportedCount: 7,
+        totalRemainingPercent: 176,
+        averageRemainingPercent: 176 / 7,
+      },
+      updatedAt: now,
+    });
+    assert.equal(JSON.stringify(readPoolStatusFromFile(statusPath, now)).includes("@"), false);
+    assert.equal(sanitizePoolStatus({ ...poolQuota, updatedAt: 1 }, now), null);
+    assert.equal(
+      sanitizePoolStatus({ ...poolQuota, accountCount: 0 }, now),
+      null,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("patches main process and preload with a narrow IPC bridge", () => {
   const main =
     "let e=require(`electron`),f=require(`node:fs`),p=require(`node:path`);function start(){}exports.runMainAppStartup=start;";
@@ -165,11 +208,19 @@ test("patches main process and preload with a narrow IPC bridge", () => {
   const patchedMain = applyTwice(applyMainProcessPatch, main);
   const patchedPreload = applyTwice(applyPreloadPatch, preload);
   assert.match(patchedMain, /codex_linux:multi-auth-thread-status/);
+  assert.match(patchedMain, /codex_linux:multi-auth-pool-status/);
   assert.match(patchedMain, /require\(`electron`\)/);
   assert.match(patchedMain, /runtime-rotation-app-bind-status\.json/);
   assert.match(patchedMain, /senderFrame/);
   assert.match(patchedPreload, /getMultiAuthThreadStatus/);
+  assert.match(patchedPreload, /getMultiAuthPoolStatus/);
   assert.match(patchedPreload, /codex_linux:multi-auth-thread-status/);
+  assert.match(patchedPreload, /codexLinuxMultiAuthPoolQuota/);
+  assert.match(patchedPreload, /Combined quota/);
+  assert.match(patchedPreload, /aria-label/);
+  assert.match(patchedPreload, /setInterval/);
+  assert.match(patchedPreload, /focus/);
+  assert.doesNotThrow(() => new Function(patchedPreload));
 });
 
 test("adds the routed account and its quota rows to the current status dialog", () => {

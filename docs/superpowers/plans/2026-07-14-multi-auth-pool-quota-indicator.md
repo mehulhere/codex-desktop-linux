@@ -177,14 +177,13 @@ git commit -m "feat: publish combined quota pool status"
 
 **Files:**
 - Modify: `linux-features/multi-auth-thread-status/main-process.js`
-- Create: `linux-features/multi-auth-thread-status/toolbar.js`
 - Modify: `linux-features/multi-auth-thread-status/patch.js`
 - Modify: `linux-features/multi-auth-thread-status/test.js`
 - Modify: `linux-features/multi-auth-thread-status/README.md`
 
 **Interfaces:**
 - Consumes: Task 2's redacted status-file `poolQuota` object.
-- Produces: preload method `getMultiAuthPoolStatus()` and a toolbar component marker `codexLinuxMultiAuthPoolQuota`.
+- Produces: preload method `getMultiAuthPoolStatus()` and a preload-owned toolbar control marker `codexLinuxMultiAuthPoolQuota`.
 
 - [ ] **Step 1: Write failing sanitizer, bridge, and toolbar patch tests**
 
@@ -221,15 +220,22 @@ getMultiAuthPoolStatus: async () =>
   electron.ipcRenderer.invoke("codex_linux:multi-auth-pool-status")
 ```
 
-- [ ] **Step 4: Implement the fail-soft toolbar patch**
+- [ ] **Step 4: Implement the fail-soft preload toolbar control**
 
-Locate the current top-right layout-control component in the extracted upstream asset and inject one React component invocation adjacent to those controls. The injected component fetches on mount, every 60 seconds, and on `window.focus`; shows the rounded seven-day average or `—`; supplies a descriptive `aria-label`; and uses hover plus keyboard focus to show total, average, account count, 5-hour unavailable state, and snapshot age.
+Inject one isolated DOM control beside the top-right layout controls from the
+existing preload patch. The control fetches on mount, every 60 seconds, and on
+`window.focus`; shows the rounded seven-day average or `—`; supplies a
+descriptive `aria-label`; and uses hover plus keyboard focus to show total,
+average, account count, 5-hour unavailable state, and snapshot age.
 
-Keep all styles inline or in existing utility classes so the feature needs no global stylesheet patch. Guard insertion with the `codexLinuxMultiAuthPoolQuota` marker and return the original source on non-unique or drifted anchors.
+Keep all styles inline so the feature needs no global stylesheet patch. Guard
+insertion with the `codexLinuxMultiAuthPoolQuota` marker and return the original
+source when the preload bridge anchor drifts.
 
 - [ ] **Step 5: Register the descriptor and document behavior**
 
-Add a `pool-toolbar` `webview-asset` descriptor targeting the exact current toolbar bundle. Update the README examples and explain the 60-second local snapshot refresh and update persistence.
+Reuse the existing `preload-bridge` descriptor. Update the README examples and
+explain the 60-second local snapshot refresh and update persistence.
 
 - [ ] **Step 6: Run feature and patch suites**
 
