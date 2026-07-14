@@ -36,7 +36,11 @@ const MAIN_RESPONSE_REPLACEMENT =
 const MAIN_REGISTRATION_NEEDLE =
   'r.add(t.addRequestHandler(`thread-follower-set-queued-follow-ups-state`,i,async t=>this.messageHandler.handleThreadFollowerSetQueuedFollowUpsStateRequest(e,t))),r.add(()=>t.dispose())';
 const MAIN_REGISTRATION_REPLACEMENT =
-  'r.add(t.addRequestHandler(`thread-follower-set-queued-follow-ups-state`,i,async t=>this.messageHandler.handleThreadFollowerSetQueuedFollowUpsStateRequest(e,t)));let a=async()=>this.options.windowManager.getPrimaryWindow()?.webContents.id===e.id;for(let n of[`thread-follower-open-side-chat`,`thread-follower-append-queued-follow-up`,`thread-follower-read-composer-draft`,`thread-follower-set-composer-draft`,`thread-follower-type-and-submit-message`])r.add(t.addRequestHandler(n,a,async t=>this.messageHandler.handleCodexLinuxFarfieldRequest(e,t)));r.add(t.addRequestHandler(`thread-follower-refresh-conversation`,a,async t=>{let{conversationId:n}=t.params;if(typeof n!==`string`||n.length===0)throw Error(`Refresh conversationId is required.`);let r=c.BrowserWindow.getAllWindows().filter(n=>!n.isDestroyed()&&this.options.windowManager.isAppServiceWindow(n));if(r.length===0)throw Error(`No Desktop app window is available for refresh.`);setTimeout(()=>{for(let t of r)t.isDestroyed()||t.webContents.isDestroyed()||t.webContents.reload()},0);return{conversationId:n,refreshScheduled:!0}}));r.add(()=>t.dispose())';
+  'r.add(t.addRequestHandler(`thread-follower-set-queued-follow-ups-state`,i,async t=>this.messageHandler.handleThreadFollowerSetQueuedFollowUpsStateRequest(e,t)));let a=async()=>this.options.windowManager.getPrimaryWindow()?.webContents.id===e.id;for(let n of[`thread-follower-open-side-chat`,`thread-follower-append-queued-follow-up`,`thread-follower-read-composer-draft`,`thread-follower-set-composer-draft`,`thread-follower-type-and-submit-message`])r.add(t.addRequestHandler(n,a,async t=>this.messageHandler.handleCodexLinuxFarfieldRequest(e,t)));r.add(t.addRequestHandler(`thread-follower-refresh-conversation`,async()=>!0,async t=>{let{conversationId:n}=t.params;if(typeof n!==`string`||n.length===0)throw Error(`Refresh conversationId is required.`);let r=c.BrowserWindow.getAllWindows().filter(n=>!n.isDestroyed()&&this.options.windowManager.isAppServiceWindow(n));if(r.length===0)throw Error(`No Desktop app window is available for refresh.`);setTimeout(()=>{for(let t of r)t.isDestroyed()||t.webContents.isDestroyed()||t.webContents.reload()},0);return{conversationId:n,refreshScheduled:!0}}));r.add(()=>t.dispose())';
+const MAIN_REFRESH_PREDICATE_NEEDLE =
+  'addRequestHandler(`thread-follower-refresh-conversation`,a,async t=>';
+const MAIN_REFRESH_PREDICATE_REPLACEMENT =
+  'addRequestHandler(`thread-follower-refresh-conversation`,async()=>!0,async t=>';
 const MAIN_REFRESH_HANDLER_NEEDLE =
   'async t=>{if(typeof t.conversationId!==`string`||t.conversationId.length===0)throw Error(`Refresh conversationId is required.`);let n=c.BrowserWindow.getAllWindows().filter(n=>!n.isDestroyed()&&this.options.windowManager.isAppServiceWindow(n));if(n.length===0)throw Error(`No Desktop app window is available for refresh.`);setTimeout(()=>{for(let t of n)t.isDestroyed()||t.webContents.isDestroyed()||t.webContents.reload()},0);return{conversationId:t.conversationId,refreshScheduled:!0}}';
 const MAIN_REFRESH_HANDLER_REPLACEMENT =
@@ -94,9 +98,17 @@ function applyFarfieldProtocolPatch(source) {
 
 function applyFarfieldMainProcessPatch(source) {
   if (source.includes(MAIN_PROCESS_MARKER)) {
-    return source.includes(MAIN_REFRESH_HANDLER_NEEDLE)
-      ? source.replace(MAIN_REFRESH_HANDLER_NEEDLE, MAIN_REFRESH_HANDLER_REPLACEMENT)
-      : source;
+    let patched = source;
+    if (patched.includes(MAIN_REFRESH_HANDLER_NEEDLE)) {
+      patched = patched.replace(MAIN_REFRESH_HANDLER_NEEDLE, MAIN_REFRESH_HANDLER_REPLACEMENT);
+    }
+    if (patched.includes(MAIN_REFRESH_PREDICATE_NEEDLE)) {
+      patched = patched.replace(
+        MAIN_REFRESH_PREDICATE_NEEDLE,
+        MAIN_REFRESH_PREDICATE_REPLACEMENT,
+      );
+    }
+    return patched;
   }
   const needles = [
     MAIN_METHOD_MAP_NEEDLE,

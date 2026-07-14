@@ -197,7 +197,7 @@ test("forwards composer requests to the primary renderer and refreshes all app w
   );
   assert.match(
     patched,
-    /addRequestHandler\(`thread-follower-refresh-conversation`,a,async t=>/,
+    /addRequestHandler\(`thread-follower-refresh-conversation`,async\(\)=>!0,async t=>/,
   );
   assert.match(patched, /let\{conversationId:n\}=t\.params/);
   assert.match(patched, /c\.BrowserWindow\.getAllWindows\(\)/);
@@ -219,6 +219,10 @@ test("upgrades the refresh handler in an already-patched Desktop bundle", () => 
   const patched = applyFarfieldMainProcessPatch(source);
 
   assert.match(patched, /let\{conversationId:n\}=t\.params/);
+  assert.match(
+    patched,
+    /addRequestHandler\(`thread-follower-refresh-conversation`,async\(\)=>!0,async t=>/,
+  );
   assert.doesNotMatch(patched, /typeof t\.conversationId/);
   assert.equal(applyFarfieldMainProcessPatch(patched), patched);
 });

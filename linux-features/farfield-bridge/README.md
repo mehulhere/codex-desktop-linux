@@ -22,7 +22,9 @@ Desktop's live renderers miss the terminal app-server event, Farfield asks the
 Desktop main process to reload its registered app windows after completion.
 Refreshing both the primary window and auxiliary task overlays makes the
 completed answer visible immediately and lets Desktop drain any shared native
-follow-up queue.
+follow-up queue. Any surviving renderer may acknowledge this refresh request,
+so a primary window that lost its IPC registration after a router restart can
+self-reconnect without restarting Desktop.
 
 Queue appends merge into Desktop's current global queue state, persist that
 state, publish `thread-queued-followups-changed`, and return the accepted
