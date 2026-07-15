@@ -45,6 +45,19 @@ def installed_build_fingerprint(app_dir: Path) -> str:
             )
         else:
             metadata.append({"path": relative_path, "missing": True})
+    webview_assets_root = app_dir / "content" / "webview" / "assets"
+    if webview_assets_root.is_dir():
+        for path in sorted(webview_assets_root.rglob("*")):
+            if not path.is_file():
+                continue
+            stat = path.stat()
+            metadata.append(
+                {
+                    "path": str(path.relative_to(app_dir)),
+                    "size": stat.st_size,
+                    "mtimeNs": stat.st_mtime_ns,
+                }
+            )
     digest.update(b"installed-files-v1\0")
     digest.update(json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode())
     return digest.hexdigest()
