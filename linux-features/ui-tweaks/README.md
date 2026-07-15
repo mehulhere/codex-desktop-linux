@@ -18,6 +18,7 @@ Enable it in the local, gitignored feature config:
 | Tweak | Patch module | What it does | Settings |
 | --- | --- | --- | --- |
 | `sidebar.projectName` | `patches/sidebar-project-name.js` | Styles project names in the left sidebar project list. It does not style `Projects` / `Chats` section headings and does not style chat rows. | `tweaks.sidebar.projectName.enabled`, `tweaks.sidebar.projectName.style` |
+| `sidebar.hideProfileName` | `patches/hide-profile-name.js` | Removes the signed-in account name from the sidebar footer while retaining the profile avatar/menu and Help control. | `tweaks.sidebar.hideProfileName.enabled` |
 
 ## Settings
 
@@ -74,6 +75,13 @@ Config keys:
   syntax that could escape the scoped rule warns and falls back to the default.
   The default is `font-weight: 700 !important; padding-top: 0.25rem;`, so
   project names are bold with a small top offset and no color is forced.
+
+### `sidebar.hideProfileName`
+
+Removes only the visible signed-in account name from the sidebar footer. The
+avatar remains available as the profile-menu trigger, and authentication,
+settings, Help, and multi-auth routing behavior are unchanged. Set
+`tweaks.sidebar.hideProfileName.enabled` to `false` to show the name again.
 
 ## Drift Behavior
 

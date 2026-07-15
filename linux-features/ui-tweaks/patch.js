@@ -1,6 +1,7 @@
 "use strict";
 
 const sidebarProjectName = require("./patches/sidebar-project-name.js");
+const hideProfileName = require("./patches/hide-profile-name.js");
 
 function patchesFrom(...modules) {
   return modules.flatMap((moduleExports) =>
@@ -9,5 +10,5 @@ function patchesFrom(...modules) {
 }
 
 module.exports = {
-  descriptors: patchesFrom(sidebarProjectName),
+  descriptors: patchesFrom(sidebarProjectName, hideProfileName),
 };

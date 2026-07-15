@@ -11,6 +11,9 @@
       "projectName": {
         "enabled": true,
         "style": "font-weight: 700 !important; padding-top: 0.25rem;"
+      },
+      "hideProfileName": {
+        "enabled": true
       }
     }
   }

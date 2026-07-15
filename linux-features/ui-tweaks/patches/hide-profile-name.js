@@ -1,0 +1,55 @@
+"use strict";
+
+const PROFILE_FOOTER_ASSET_PATTERN = /^app-initial~app-main~page-[^.]+\.js$/;
+const PROFILE_FOOTER_MARKER = "codex.profileFooter.openProfileMenu";
+const PROFILE_BUTTON_CHILDREN_PATTERN =
+  /(onClick:[A-Za-z_$][\w$]*,children:\[)([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)(\]\})/;
+
+function hideProfileNameEnabled(context) {
+  const defaults = context?.feature?.manifest?.tweaks?.sidebar?.hideProfileName;
+  const settings = context?.feature?.settings?.tweaks?.sidebar?.hideProfileName;
+  return (settings?.enabled ?? defaults?.enabled) !== false;
+}
+
+function applyHideProfileNamePatch(source, context = {}) {
+  if (typeof source !== "string" || !hideProfileNameEnabled(context)) {
+    return source;
+  }
+  const markerIndex = source.indexOf(PROFILE_FOOTER_MARKER);
+  if (markerIndex < 0) {
+    return source;
+  }
+  const componentStart = source.lastIndexOf("function ", markerIndex);
+  if (componentStart < 0) {
+    return source;
+  }
+  const searchEnd = Math.min(source.length, markerIndex + 8_000);
+  const componentSource = source.slice(componentStart, searchEnd);
+  const patchedComponent = componentSource.replace(
+    PROFILE_BUTTON_CHILDREN_PATTERN,
+    "$1$2$4",
+  );
+  if (patchedComponent === componentSource) {
+    return source;
+  }
+  return `${source.slice(0, componentStart)}${patchedComponent}${source.slice(searchEnd)}`;
+}
+
+const descriptors = [
+  {
+    id: "hide-profile-name",
+    phase: "webview-asset",
+    order: 20_795,
+    ciPolicy: "optional",
+    pattern: PROFILE_FOOTER_ASSET_PATTERN,
+    missingDescription: "sidebar profile footer bundle",
+    skipDescription: "ui-tweaks hide profile name patch",
+    apply: applyHideProfileNamePatch,
+  },
+];
+
+module.exports = {
+  PROFILE_FOOTER_ASSET_PATTERN,
+  applyHideProfileNamePatch,
+  descriptors,
+};
