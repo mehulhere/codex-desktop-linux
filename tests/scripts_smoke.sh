@@ -4729,6 +4729,57 @@ PY
     fi
 }
 
+test_webview_cache_invalidation() {
+    info "Checking build-aware webview cache invalidation"
+    local workspace="$TMP_DIR/webview-cache-invalidation"
+    local app_dir="$workspace/app"
+    local state_dir="$workspace/state"
+    local user_data_dir="$workspace/user-data"
+    local helper="$REPO_DIR/launcher/webview-cache.py"
+    local cache_name
+
+    mkdir -p "$app_dir/resources" "$state_dir" "$user_data_dir/Local Storage"
+    printf '%s\n' '{"version":"first"}' > "$app_dir/resources/codex-linux-build-info.json"
+    printf '%s\n' 'preserve-local-storage' > "$user_data_dir/Local Storage/state"
+    printf '%s\n' 'preserve-cookies' > "$user_data_dir/Cookies"
+    printf '%s\n' 'preserve-settings' > "$user_data_dir/settings.json"
+    for cache_name in "Cache" "Code Cache" "Service Worker"; do
+        mkdir -p "$user_data_dir/$cache_name"
+        printf '%s\n' 'stale' > "$user_data_dir/$cache_name/sentinel"
+    done
+
+    python3 "$helper" \
+        --app-dir "$app_dir" \
+        --state-dir "$state_dir" \
+        --user-data-dir "$user_data_dir"
+
+    assert_file_exists "$state_dir/webview-cache-fingerprint-v1"
+    for cache_name in "Cache" "Code Cache" "Service Worker"; do
+        assert_file_not_exists "$user_data_dir/$cache_name"
+    done
+    assert_file_exists "$user_data_dir/Local Storage/state"
+    assert_file_exists "$user_data_dir/Cookies"
+    assert_file_exists "$user_data_dir/settings.json"
+
+    mkdir -p "$user_data_dir/Code Cache"
+    printf '%s\n' 'keep-when-unchanged' > "$user_data_dir/Code Cache/sentinel"
+    python3 "$helper" \
+        --app-dir "$app_dir" \
+        --state-dir "$state_dir" \
+        --user-data-dir "$user_data_dir"
+    assert_file_exists "$user_data_dir/Code Cache/sentinel"
+
+    printf '%s\n' '{"version":"second"}' > "$app_dir/resources/codex-linux-build-info.json"
+    python3 "$helper" \
+        --app-dir "$app_dir" \
+        --state-dir "$state_dir" \
+        --user-data-dir "$user_data_dir"
+    assert_file_not_exists "$user_data_dir/Code Cache"
+    assert_file_exists "$user_data_dir/Local Storage/state"
+    assert_file_exists "$user_data_dir/Cookies"
+    assert_file_exists "$user_data_dir/settings.json"
+}
+
 test_webview_server_cache_policy() {
     info "Checking webview server cache policy"
     python3 - "$REPO_DIR/launcher/webview-server.py" <<'PY'
@@ -7533,6 +7584,7 @@ main() {
     test_launcher_managed_node_handles_unset_path
     test_launcher_template_sanity
     test_launcher_cli_resolution_policy
+    test_webview_cache_invalidation
     test_webview_server_cache_policy
     test_process_detection_helper_cmdline_shapes
     test_webview_probe_equivalence
