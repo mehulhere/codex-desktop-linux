@@ -53,6 +53,26 @@ MULTI_LAUNCH_ACTIVE=0
 CODEX_LINUX_INSTANCE_ID=""
 LAUNCHER_ARGS=()
 
+electron_user_data_dir() {
+    if [ -n "${CODEX_ELECTRON_USER_DATA_DIR:-}" ]; then
+        printf '%s\n' "$CODEX_ELECTRON_USER_DATA_DIR"
+        return 0
+    fi
+
+    printf '%s/Codex\n' "${XDG_CONFIG_HOME:-$HOME/.config}"
+}
+
+invalidate_webview_cache() {
+    local user_data_dir
+    user_data_dir="$(electron_user_data_dir)"
+    if ! python3 "$SCRIPT_DIR/.codex-linux/webview-cache.py" \
+        --app-dir "$SCRIPT_DIR" \
+        --state-dir "$APP_STATE_DIR" \
+        --user-data-dir "$user_data_dir"; then
+        echo "WARN: webview cache invalidation did not complete; the next cold launch will retry" >&2
+    fi
+}
+
 # Internal marker consumed by patched Electron bundles; never trust inheritance.
 unset CODEX_LINUX_MULTI_LAUNCH
 
@@ -3557,6 +3577,8 @@ elif needs_cold_start; then
     log_phase "packaged_prelaunch_start"
     run_packaged_runtime_prelaunch
     log_phase "packaged_prelaunch"
+    invalidate_webview_cache
+    log_phase "webview_cache_checked"
     start_webview_server
 else
     echo "Skipping packaged prelaunch and webview setup for warm start"
