@@ -22,6 +22,24 @@ const LINUX_APP_SERVER_CONVERSATION_HYDRATION_QUEUE_MARKER = "codexLinuxRemoteMo
 const LINUX_APP_SERVER_CONVERSATION_HYDRATION_IN_FLIGHT_MARKER = "codexLinuxRemoteMobileHydrationInFlight";
 const LINUX_APP_SERVER_CONVERSATION_HYDRATION_LATE_EVENT_MARKER = "codexLinuxRemoteMobileHydrateLateEvent";
 const LINUX_QUERY_STRUCTURAL_SHARING_GUARD_MARKER = "codexLinuxQueryStructuralSharingGuard";
+const LINUX_RENDERER_LOGGING_GUARD_MARKER = "codexLinuxRendererLoggingGuard";
+
+function applyLinuxRendererLoggingGuardPatch(currentSource) {
+  if (currentSource.includes(LINUX_RENDERER_LOGGING_GUARD_MARKER)) {
+    return currentSource;
+  }
+
+  const loggingNeedle = "function JPe(e){AC?.(`log-message`,e)}";
+  if (!currentSource.includes(loggingNeedle)) {
+    return currentSource;
+  }
+
+  const patchedSource = currentSource.replace(
+    loggingNeedle,
+    "function JPe(e){try{AC?.(`log-message`,e)}catch{}}",
+  );
+  return `const ${LINUX_RENDERER_LOGGING_GUARD_MARKER}=!0;${patchedSource}`;
+}
 
 function applyLinuxQueryStructuralSharingGuardPatch(currentSource) {
   if (currentSource.includes(LINUX_QUERY_STRUCTURAL_SHARING_GUARD_MARKER)) {
@@ -2022,6 +2040,7 @@ function patchCommentPreloadBundle(extractedDir) {
 
 module.exports = {
   applyLinuxQueryStructuralSharingGuardPatch,
+  applyLinuxRendererLoggingGuardPatch,
   applyBrowserAnnotationScreenshotPatch,
   applyLinuxAppServerBackfillWaitPatch,
   applyLinuxAppServerConversationHydrationPatch,
