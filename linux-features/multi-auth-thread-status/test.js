@@ -218,6 +218,8 @@ test("patches main process and preload with a narrow IPC bridge", () => {
   assert.match(patchedPreload, /codexLinuxMultiAuthPoolQuota/);
   assert.match(patchedPreload, /Combined quota/);
   assert.match(patchedPreload, /aria-label/);
+  assert.match(patchedPreload, /top:\s*["']4px["']/);
+  assert.match(patchedPreload, /WebkitAppRegion:\s*["']no-drag["']/);
   assert.match(patchedPreload, /setInterval/);
   assert.match(patchedPreload, /focus/);
   assert.doesNotThrow(() => new Function(patchedPreload));

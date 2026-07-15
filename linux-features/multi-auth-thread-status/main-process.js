@@ -150,10 +150,13 @@ function poolQuotaUiBootstrap(ipcRenderer, channel) {
     root.id = "codex-linux-multi-auth-pool-quota";
     Object.assign(root.style, {
       position: "fixed",
-      top: "52px",
+      // The Linux window uses a frameless title bar, so keep the compact
+      // indicator in that upper chrome instead of covering the app toolbar.
+      top: "4px",
       right: "88px",
       zIndex: "2147483000",
       fontFamily: "ui-sans-serif,system-ui,sans-serif",
+      WebkitAppRegion: "no-drag",
     });
     button.type = "button";
     button.setAttribute("aria-label", "Combined quota unavailable");
@@ -166,6 +169,7 @@ function poolQuotaUiBootstrap(ipcRenderer, channel) {
       cursor: "default",
       background: "#555",
       color: "#f5f5f5",
+      WebkitAppRegion: "no-drag",
     });
     Object.assign(inner.style, {
       display: "flex",
