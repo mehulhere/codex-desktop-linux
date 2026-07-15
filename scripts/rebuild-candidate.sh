@@ -151,6 +151,7 @@ fi
 
 info "1/2 Inspecting upstream DMG"
 "$REPO_DIR/install.sh" --inspect --report-dir "$REPORT_DIR" "${dmg_args[@]}"
+node "$REPO_DIR/linux-features/farfield-bridge/verify-build.js" "$PATCH_REPORT"
 
 if [ -z "$DMG_PATH" ]; then
     DMG_PATH="$REPO_DIR/Codex.dmg"
@@ -165,6 +166,7 @@ CODEX_PATCH_REPORT_JSON="$PATCH_REPORT" \
 CODEX_REBUILD_REPORT_JSON="$REBUILD_REPORT" \
 REBUILD_REPORT_DIR="$REPORT_DIR" \
     "$REPO_DIR/install.sh" "${dmg_args[@]}"
+node "$REPO_DIR/linux-features/farfield-bridge/verify-build.js" "$PATCH_REPORT"
 
 BACKUP_APP_DIR=""
 if [ "$INSTALL_AFTER_BUILD" -eq 1 ]; then

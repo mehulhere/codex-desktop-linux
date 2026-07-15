@@ -21,6 +21,7 @@ const {
   applyComposerControlPatch,
   applyComposerPatch,
   applyComposerRuntimePatch,
+  applyCurrentLinuxDictationAvailabilityPatch,
   applyDictationEndpointPatch,
   applyReadAloudMainBundlePatch,
   descriptors: featurePatches,
@@ -86,6 +87,9 @@ const explicitButtonMainBundleSource =
 const dictationSource =
   "function Ht(){let {recordingDurationMs:T,waveformCanvasRef:E,startWaveformCapture:Wc,stopWaveformCapture:D,resetWaveformDisplay:k}=Ve(),m={current:null},_={current:null},g={current:[]},y={current:null},C={current:null};let j=async({action:e,handlers:n})=>{let i=`hello`;i.length>0&&(j.getInstance().dispatchMessage(`global-dictation-record-history-item`,{text:i}),e===`send`?n.onTranscriptSend(i):n.onTranscriptInsert(i))};let A=async()=>{let e=y.current??`insert`;y.current=null;let r=m.current,i=g.current;g.current=[],r&&(r.ondataavailable=null,r.onstop=null),m.current=null,D();};let a=z(e=>{y.current=e;let t=m.current;if(!t){A();return}if(t.state===`inactive`){A();return}t.stop()});return{startDictation:z(async()=>{let e=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1}});let t=new MediaRecorder(e);m.current=t,g.current=[],t.ondataavailable=e=>{e.data.size>0&&g.current.push(e.data)},t.onstop=()=>{A()},t.start(),l(!0)}),stopDictation:a}}function Kt(){let p={current:null};let x=e=>{!d||p.current!==e.sessionId||(p.current=null,o(`insert`))}}";
 
+const currentLinuxDictationAvailabilitySource =
+  "function CIe(e){let t=cache(),s=store(),c=intl(),l=Ql(`3207467860`),u=FG,d=Wle(Uh),f=ref(!1),p=ref(!1);let g=h,_,v=_,y=n&&d===!0;let oe=d!==!1,se=d===!0,G;return G={isDictationButtonVisible:oe,isDictationSupported:se,startDictation:j}}";
+
 const composerControlSource =
   "function mz(e){let {voiceControls:z}=e;let Be=ze,Ve=F===`empty-message`&&!A&&(ue.isAvailable&&ue.phase!==`active`||J),He=si(fc,`composer.startVoiceMode`),Ue;Ue=()=>{if(ue.phase===`starting`||ue.phase===`active`){ue.stopRealtime();return}if(ue.isAvailable){ue.phase===`inactive`&&ue.startRealtime(`composer_button_existing_thread`);return}ce()};let e=G.formatMessage({id:`composer.realtime.start.aria`,defaultMessage:`Start realtime voice`,description:`Aria label for the button that starts realtime voice mode in the composer`});let n=G.formatMessage({id:`composer.realtime.start.tooltip`,defaultMessage:`Start realtime voice`,description:`Tooltip for the button that starts realtime voice mode in the composer`});}";
 
@@ -129,6 +133,20 @@ test("dictation endpoint descriptor tracks moved upstream composer bundle", () =
   assert.equal(descriptor.pattern.test("app-initial~app-main~onboarding-page-BUwCKIcU.js"), true);
   assert.equal(descriptor.pattern.test("use-dictation-BUwCKIcU.js"), true);
   assert.equal(descriptor.pattern.test("use-dictation-hotkey-BUwCKIcU.js"), false);
+});
+
+test("current Linux composer enables native dictation when the upstream rollout gate is off", () => {
+  const patched = twice(
+    applyCurrentLinuxDictationAvailabilityPatch,
+    currentLinuxDictationAvailabilitySource,
+  );
+
+  assert.match(
+    patched,
+    /navigator\.userAgent\.includes\("Linux"\)\?!0:Wle\(Uh\)/,
+  );
+  assert.match(patched, /isDictationButtonVisible:oe/);
+  assert.match(patched, /isDictationSupported:se/);
 });
 
 function fetchBodies(events) {
@@ -423,6 +441,7 @@ test("conversation mode exposes optional patch descriptors when enabled", () => 
       patches.map((patch) => [patch.name, patch.phase, patch.ciPolicy]),
       [
         ["feature:conversation-mode:read-aloud-conversation-source", "main-bundle", "optional"],
+        ["feature:conversation-mode:linux-dictation-availability", "webview-asset", "optional"],
         ["feature:conversation-mode:dictation-endpoint", "webview-asset", "optional"],
         ["feature:conversation-mode:composer-control", "webview-asset", "optional"],
         ["feature:conversation-mode:assistant-observer", "webview-asset", "optional"],
@@ -2056,6 +2075,10 @@ test("conversation mode patches matching app assets and records report entries",
         fs.writeFileSync(path.join(buildDir, "main.js"), mainBundleSource);
         fs.writeFileSync(path.join(tempApp, "package.json"), JSON.stringify({ name: "codex" }));
         fs.writeFileSync(path.join(assetsDir, "browser-sidebar-comment-light-dismiss-test.js"), dictationSource);
+        fs.writeFileSync(
+          path.join(assetsDir, "app-initial~app-main~page-current.js"),
+          currentLinuxDictationAvailabilitySource,
+        );
         fs.writeFileSync(path.join(assetsDir, "composer-test.js"), composerControlSource);
         fs.writeFileSync(path.join(assetsDir, "local-conversation-turn-test.js"), assistantRenderSource);
 
@@ -2083,6 +2106,7 @@ test("conversation mode patches matching app assets and records report entries",
         );
         for (const name of [
           "feature:conversation-mode:read-aloud-conversation-source",
+          "feature:conversation-mode:linux-dictation-availability",
           "feature:conversation-mode:dictation-endpoint",
           "feature:conversation-mode:composer-control",
           "feature:conversation-mode:assistant-observer",
@@ -2104,6 +2128,7 @@ test("feature patch list is intentionally small", () => {
     featurePatches.map((patch) => [patch.id, patch.phase]),
     [
       ["read-aloud-conversation-source", "main-bundle"],
+      ["linux-dictation-availability", "webview-asset"],
       ["dictation-endpoint", "webview-asset"],
       ["composer-control", "webview-asset"],
       ["assistant-observer", "webview-asset"],

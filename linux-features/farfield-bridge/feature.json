@@ -1,0 +1,8 @@
+{
+  "id": "farfield-bridge",
+  "name": "Farfield bridge",
+  "description": "Adds acknowledged native composer takeover, queue, refresh, and temporary side-task requests for Farfield.",
+  "entrypoints": {
+    "patchDescriptors": "./patch.js"
+  }
+}

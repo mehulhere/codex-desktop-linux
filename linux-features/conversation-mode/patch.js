@@ -435,6 +435,29 @@ function applyDictationEndpointPatch(source) {
   return patched;
 }
 
+function applyCurrentLinuxDictationAvailabilityPatch(source) {
+  if (source.includes('navigator.userAgent.includes("Linux")?!0:')) {
+    return source;
+  }
+  if (!source.includes('Ql(`3207467860`)') || !source.includes("isDictationButtonVisible")) {
+    return source;
+  }
+  const availabilityPattern = new RegExp(
+    `(${JS_IDENT}=Ql\\(` +
+      "`3207467860`" +
+      `\\),${JS_IDENT}=${JS_IDENT},)(${JS_IDENT})=(${JS_IDENT}\\(${JS_IDENT}\\))`,
+  );
+  const match = source.match(availabilityPattern);
+  if (!match) {
+    warn("Could not find current dictation availability gate", "Linux dictation availability patch");
+    return source;
+  }
+  return source.replace(
+    availabilityPattern,
+    `$1$2=navigator.userAgent.includes("Linux")?!0:$3`,
+  );
+}
+
 function propVar(match, name) {
   const re = new RegExp(`${name}:([A-Za-z_$][\\w$]*)`);
   return match.match(re)?.[1] ?? "null";
@@ -476,6 +499,7 @@ module.exports = {
   applyComposerControlPatch,
   applyComposerPatch,
   applyComposerRuntimePatch,
+  applyCurrentLinuxDictationAvailabilityPatch,
   applyDictationEndpointPatch,
   applyReadAloudMainBundlePatch,
   descriptors: [
@@ -485,6 +509,16 @@ module.exports = {
       order: 20680,
       ciPolicy: "optional",
       apply: applyReadAloudMainBundlePatch,
+    },
+    {
+      id: "linux-dictation-availability",
+      phase: "webview-asset",
+      order: 20685,
+      ciPolicy: "optional",
+      pattern: /^app-initial~app-main~page-.*\.js$/,
+      missingDescription: "current composer page bundle",
+      skipDescription: "Linux dictation availability patch",
+      apply: applyCurrentLinuxDictationAvailabilityPatch,
     },
     {
       id: "dictation-endpoint",

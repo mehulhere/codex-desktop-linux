@@ -1,3 +1,9 @@
 [workspace]
 members = ["computer-use-linux", "read-aloud-linux", "updater", "record-replay-linux"]
 resolver = "2"
+
+[patch.crates-io]
+# Security backport from wayland-rs d07c4f91. The upstream scanner release still
+# pins vulnerable quick-xml 0.39, while current git also contains incompatible
+# client/backend API changes, so keep the released scanner and backport only the fix.
+wayland-scanner = { path = "vendor/wayland-scanner-0.31.10" }

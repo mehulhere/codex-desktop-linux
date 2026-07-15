@@ -36,6 +36,10 @@ const {
   sidebarProjectNameCss,
 } = require("./patches/sidebar-project-name.js");
 const {
+  PROFILE_FOOTER_ASSET_PATTERN,
+  applyHideProfileNamePatch,
+} = require("./patches/hide-profile-name.js");
+const {
   ENGLISH_REASONING_LABELS,
   ZH_CN_LOCALE_ASSET_PATTERN,
   applyEnglishReasoningLabels,
@@ -45,6 +49,15 @@ function projectBundleFixture() {
   return [
     "function row(){let j=Pn(`group/folder-row group relative flex h-[var(--height-token-row)] text-sm text-token-foreground`);",
     "let V=(0,Iy.jsx)(`span`,{className:`text-fade-truncate pr-1`,children:p});return [j,V]}",
+  ].join("");
+}
+
+function profileFooterBundleFixture() {
+  return [
+    "function Lwe(){let A=`Example User`,B=avatar,V=(0,yq.jsx)(`span`,{children:A});",
+    "let H=(0,yq.jsxs)(`button`,{\"aria-label\":R,onClick:z,children:[B,V]});",
+    "return (0,yq.jsxs)(`div`,{children:[H,help]})}",
+    "const profileMarker={id:`codex.profileFooter.openProfileMenu`};",
   ].join("");
 }
 
@@ -170,11 +183,33 @@ test("ui-tweaks is discoverable and disabled until listed in features.json", () 
           "optional",
         ],
         ["feature:ui-tweaks:reasoning-effort-labels-english", "webview-asset", "optional"],
+        ["feature:ui-tweaks:hide-profile-name", "webview-asset", "optional"],
       ],
     );
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+test("profile footer keeps the menu avatar and help control but removes the account name", () => {
+  const source = profileFooterBundleFixture();
+  const patched = applyHideProfileNamePatch(source);
+
+  assert.notEqual(patched, source);
+  assert.match(patched, /children:\[B\]/);
+  assert.doesNotMatch(patched, /children:\[B,V\]/);
+  assert.match(patched, /children:\[H,help\]/);
+  assert.equal(applyHideProfileNamePatch(patched), patched);
+});
+
+test("profile footer name patch targets only the current sidebar page asset", () => {
+  assert.match("app-initial~app-main~page-Cmd9LUYY.js", PROFILE_FOOTER_ASSET_PATTERN);
+  assert.doesNotMatch("composer-Cmd9LUYY.js", PROFILE_FOOTER_ASSET_PATTERN);
+});
+
+test("profile footer name patch skips unrelated assets", () => {
+  const source = "console.log('not the profile footer');";
+  assert.equal(applyHideProfileNamePatch(source), source);
 });
 
 test("model picker descriptors target the current state and menu bundles", () => {
