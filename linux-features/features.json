@@ -1,0 +1,16 @@
+{
+  "enabled": [
+    "codex-wrapper-updater",
+    "composer-dictation",
+    "conversation-mode",
+    "farfield-bridge",
+    "mcp-helper-reaper",
+    "multi-auth-thread-status",
+    "node-repl-reaper",
+    "persistent-status-panel",
+    "read-aloud",
+    "read-aloud-mcp",
+    "ui-tweaks",
+    "unified-provider-history"
+  ]
+}

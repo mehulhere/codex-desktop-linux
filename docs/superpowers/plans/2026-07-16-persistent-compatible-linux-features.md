@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Persist and validate the approved 15-feature personal Codex Desktop Linux profile on the stable `14421b8` source baseline.
+**Goal:** Persist and validate the compatible 12-feature personal Codex Desktop Linux profile on the stable `14421b8` source baseline.
 
 **Architecture:** Force-track the loader's existing `linux-features/features.json` path in the personal fork, without changing upstream defaults or feature-loader code. Validate the exact set through the loader, run feature-owned tests, then rebuild and inspect generated provenance and patch results before switching the desktop launcher.
 
@@ -12,7 +12,9 @@
 
 - The source branch and build provenance must descend from `14421b8` and contain
   no later feature implementation commits.
-- The tracked profile contains exactly the 15 approved feature ids.
+- The tracked profile contains exactly the 12 compatible feature ids; AppShots,
+  Open Target Discovery, and Remote Control UI are excluded because the current
+  upstream DMG skips required patches.
 - `linux-features/features.example.json` remains unchanged and empty.
 - Generated `codex-app` files are never committed.
 - The working plain `14421b8` runtime remains available until validation passes.
@@ -31,14 +33,13 @@
 
 **Interfaces:**
 - Consumes: `enabledLinuxFeatureIds()` from `scripts/lib/linux-features.js`.
-- Produces: an exact ordered 15-id profile consumed by `install.sh` and the updater.
+- Produces: an exact ordered 12-id profile consumed by `install.sh` and the updater.
 
 - [ ] **Step 1: Write the approved configuration**
 
 ```json
 {
   "enabled": [
-    "appshots",
     "codex-wrapper-updater",
     "composer-dictation",
     "conversation-mode",
@@ -46,11 +47,9 @@
     "mcp-helper-reaper",
     "multi-auth-thread-status",
     "node-repl-reaper",
-    "open-target-discovery",
     "persistent-status-panel",
     "read-aloud",
     "read-aloud-mcp",
-    "remote-control-ui",
     "ui-tweaks",
     "unified-provider-history"
   ]
@@ -62,7 +61,7 @@
 Run a Node assertion that loads `enabledLinuxFeatureIds()` with the repository
 configuration and compares it to the JSON array.
 
-Expected: exit code 0 and `enabled_feature_count=15`.
+Expected: exit code 0 and `enabled_feature_count=12`.
 
 - [ ] **Step 3: Run selected feature tests**
 
@@ -84,15 +83,15 @@ Expected: installer exit code 0 and `Installation complete!`.
 - [ ] **Step 5: Verify generated provenance and patch results**
 
 Assert that build info reports the clean profile commit, that commit descends
-from `14421b8`, the patch report contains all 15 selected ids, and no selected
+from `14421b8`, the patch report contains all 12 selected ids, and no selected
 feature result is missing or skipped.
 
-Expected: exit code 0, `enabled_feature_count=15`, and
+Expected: exit code 0, `enabled_feature_count=12`, and
 `selected_feature_skips=0`.
 
 - [ ] **Step 6: Cold-launch and inspect the renderer**
 
-Add a generated-only `MAIN 14421b8 · 15 FEATURES` badge, point the normal
+Add a generated-only `MAIN 14421b8 · 12 FEATURES` badge, point the normal
 desktop wrapper at the main build, stop stale Codex Electron/webview processes,
 and launch through `/var/home/poodle/.local/bin/codex-desktop`.
 

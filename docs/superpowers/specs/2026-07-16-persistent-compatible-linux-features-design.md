@@ -10,7 +10,6 @@ provider-specific, unavailable, example, and experimental features disabled.
 
 The tracked personal profile enables these feature ids:
 
-- `appshots`
 - `codex-wrapper-updater`
 - `composer-dictation`
 - `conversation-mode`
@@ -18,26 +17,30 @@ The tracked personal profile enables these feature ids:
 - `mcp-helper-reaper`
 - `multi-auth-thread-status`
 - `node-repl-reaper`
-- `open-target-discovery`
 - `persistent-status-panel`
 - `read-aloud`
 - `read-aloud-mcp`
-- `remote-control-ui`
 - `ui-tweaks`
 - `unified-provider-history`
 
 ## Deliberately Disabled
 
 - `agent-workspace`: the companion binary is not installed.
+- `appshots`: the current upstream DMG skips its availability and settings
+  patches, so the feature is incomplete.
 - `api-key-service-tier`: the active setup uses ChatGPT multi-auth rather than
   an API-key provider.
 - `authenticated-proxy`: no authenticated proxy is configured.
 - `copilot-reasoning-effort`: the active setup does not use Copilot auth.
 - `example-feature`: repository development example only.
 - `frameless-titlebar`: unnecessary for the current GNOME window setup.
+- `open-target-discovery`: the current upstream DMG applies it only partially
+  and reports missing availability and path-mode targets.
 - `record-and-replay`: specialized native capture prerequisites are not
   configured.
 - `remote-mobile-control`: experimental account-level plumbing.
+- `remote-control-ui`: the current upstream DMG skips four visibility and
+  onboarding patches, so the feature is incomplete.
 - `thorium-chrome-plugin`: Thorium is not installed.
 - `x11-ewmh-computer-use`: the active desktop session is Wayland.
 
@@ -68,12 +71,12 @@ separate design that avoids broad regex rewrites of minified bundles.
 
 ## Validation
 
-1. Parse the JSON and assert the exact 15-id set.
+1. Parse the JSON and assert the exact 12-id set.
 2. Run every available focused `test.js` for the enabled features.
 3. Rebuild from the pinned upstream DMG in `fedora-toolbox-43`.
 4. Verify build provenance is clean and descends from `14421b8` without later
    feature implementation commits.
-5. Verify all 15 ids appear in the generated patch report.
+5. Verify all 12 ids appear in the generated patch report.
 6. Reject any enabled feature whose generated patches are missing or skipped.
 7. Cold-launch through the normal desktop wrapper and verify one main Electron
    process, webview HTTP 200, and the visible build badge.
