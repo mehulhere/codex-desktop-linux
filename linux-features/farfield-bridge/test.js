@@ -10,24 +10,34 @@ const {
   loadLinuxFeaturePatchDescriptors,
 } = require("../../scripts/lib/linux-features.js");
 const {
-  applyFarfieldBridgePatch,
   applyFarfieldComposerPatch,
+  applyFarfieldDispatcherPatch,
   applyFarfieldExtractedRouterPatch,
   applyFarfieldMainProcessPatch,
   applyFarfieldProtocolPatch,
+  applyFarfieldQueuePatch,
   applyFarfieldRouterPatch,
 } = require("./patch.js");
+const { verifyFarfieldPatchReport } = require("./verify-build.js");
+
+const requiredPatchNames = [
+  "desktop-farfield-main-process",
+  "desktop-farfield-router-startup",
+  "desktop-farfield-follower-versions",
+  "desktop-farfield-follower-requests",
+  "desktop-farfield-native-queue",
+  "desktop-farfield-composer-registration",
+];
 
 const versionNeedle = '"thread-follower-set-queued-follow-ups-state":1,"thread-queued-followups-changed":1';
-const dispatcherNeedle = 'case`thread-follower-set-queued-follow-ups-state-request`:try{let{conversationId:t,state:n}=e.params;await Oc(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t}),await mu(r,x.QUEUED_FOLLOW_UPS,n),um.dispatchMessage(`thread-queued-followups-changed`,{conversationId:t,messages:n[t]??[]}),um.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,result:{ok:!0}})}catch(t){let n=t;um.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-role-request`:';
-const queueNeedle = 'function fhe(){let e=q(J),t=Eh(),{data:n}=Nu(x.QUEUED_FOLLOW_UPS)';
-const composerRegistrationNeedle = ',{onOpen:Fs,onOpenQuickChat:Is,onOpenSideChat:Ls}=gq({scope:B,conversationId:K,';
-const composerInputNeedle = 'onUserInput:()=>{Hi(B)}';
-const composerSubmitRegistrationNeedle = '(0,wq.useEffect)(()=>{},[null,In])';
+const dispatcherNeedle = 'case`thread-follower-set-queued-follow-ups-state-request`:try{let{conversationId:t,state:n}=e.params;await b(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t}),await Ve(r,Lc.QUEUED_FOLLOW_UPS,n),il.dispatchMessage(`thread-queued-followups-changed`,{conversationId:t,messages:n[t]??[]}),il.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,result:{ok:!0}})}catch(t){let n=t;il.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-role-request`:';
+const queueNeedle = 'function Sat(e){let t=$r(br),n=mh(e),{data:r,isLoading:i}=f(Zn.QUEUED_FOLLOW_UPS),a=Ct(),o=kn(`get-global-state`,{key:Zn.QUEUED_FOLLOW_UPS}),s=(0,I5.useRef)({}),c=(0,I5.useRef)(0),l=(0,I5.useRef)(0),u=(0,I5.useRef)([]),d=(0,I5.useRef)(!1);(0,I5.useEffect)';
+const composerRegistrationNeedle = ',Ls=Pa(async()=>{try{await _s(null)}catch(e){gs(e)}}),zs=Vz({conversationId:V,';
+const composerSubmitRegistrationNeedle = '(0,XY.useEffect)(()=>{},[null,Fn])';
 const composerTurnStartedNeedle =
-  'onLocalTurnStarted:e=>{xn!=null&&e.threadId!=null&&e.turnId!=null&&HS(B,xn.itemId,e.threadId,e.turnId)},openSideChatFromComposer:Ps';
+  'onLocalTurnStarted:e=>{xn!=null&&e.threadId!=null&&e.turnId!=null&&Vb(N,xn.itemId,e.threadId,e.turnId)},openSideChatFromComposer:_s';
 const composerQueuedFollowUpNeedle =
-  'if(J){vC(A,{result:Ni.CODEX_REMOTE_SSH_MESSAGE_RESULT_QUEUED,submitAction:X}),u(k.enqueue({text:q,context:oe,cwd:M})?.id??null),n(),N(!1),U&&c();return}';
+  'if(ie){yT(A,{result:wo.CODEX_REMOTE_SSH_MESSAGE_RESULT_QUEUED,submitAction:q}),u(k.enqueue({text:re,context:ue,cwd:M})?.id??null),n(),N(!1),U&&c();return}';
 const mainMethodMapNeedle =
   '"thread-follower-set-queued-follow-ups-state":`thread-follower-set-queued-follow-ups-state-request`},G$=class{';
 const mainPendingMapNeedle =
@@ -41,11 +51,7 @@ const mainResponseNeedle =
 const mainRegistrationNeedle =
   'r.add(t.addRequestHandler(`thread-follower-set-queued-follow-ups-state`,i,async t=>this.messageHandler.handleThreadFollowerSetQueuedFollowUpsStateRequest(e,t))),r.add(()=>t.dispose())';
 const routerNeedle =
-  'async connect(){if(this.disposed)return;try{await this.routerManager.startRouterIfNeeded()}catch(e){this.logger.warning(`Unable to start router if needed`,{safe:{},sensitive:{error:e}})}let e=N7();';
-
-function currentBundleFixture() {
-  return [dispatcherNeedle, queueNeedle].join(";");
-}
+  'async connect(){if(this.disposed)return;try{await this.routerManager.startRouterIfNeeded()}catch(e){this.logger.warning(`Unable to start router if needed`,{safe:{},sensitive:{error:e}})}let e=F7();';
 
 function requestCaseSource(source, method) {
   const start = source.indexOf(`case\`${method}-request\``);
@@ -55,35 +61,38 @@ function requestCaseSource(source, method) {
   return source.slice(start, end);
 }
 
-test("registers acknowledged queue and draft follower method versions", () => {
+function reportWith(statusByName = {}) {
+  return {
+    enabledFeatures: ["farfield-bridge"],
+    patches: requiredPatchNames.map((name) => ({
+      name: `feature:farfield-bridge:${name}`,
+      featureId: "farfield-bridge",
+      status: statusByName[name] ?? "applied",
+    })),
+  };
+}
+
+test("registers acknowledged queue, takeover, refresh, and side-task method versions", () => {
   const patched = applyFarfieldProtocolPatch(versionNeedle);
 
   assert.match(patched, /codexLinuxFarfieldProtocol/);
   assert.match(patched, /"thread-follower-open-side-chat":1/);
   assert.match(patched, /"thread-follower-append-queued-follow-up":1/);
-  assert.match(patched, /"thread-follower-read-composer-draft":1/);
-  assert.match(patched, /"thread-follower-set-composer-draft":1/);
   assert.match(patched, /"thread-follower-type-and-submit-message":1/);
   assert.match(patched, /"thread-follower-refresh-conversation":1/);
-  assert.match(patched, /"thread-composer-draft-changed":1/);
+  assert.doesNotMatch(patched, /composer-draft/);
   assert.equal(applyFarfieldProtocolPatch(patched), patched);
 });
 
-test("bridges acknowledged per-thread queue, draft, and takeover requests", () => {
-  const patched = applyFarfieldBridgePatch(currentBundleFixture());
+test("bridges acknowledged per-thread queue and takeover requests", () => {
+  const patched = applyFarfieldDispatcherPatch(dispatcherNeedle);
 
   assert.match(patched, /codexLinuxFarfieldBridge/);
   assert.match(patched, /case`thread-follower-append-queued-follow-up-request`/);
-  assert.match(patched, /case`thread-follower-read-composer-draft-request`/);
-  assert.match(patched, /case`thread-follower-set-composer-draft-request`/);
   assert.match(patched, /case`thread-follower-type-and-submit-message-request`/);
   assert.match(patched, /assert-thread-follower-owner-for-host/);
   assert.match(patched, /codexLinuxFarfieldAppendQueuedFollowUp/);
-  assert.match(patched, /codexLinuxFarfieldReadDraft/);
-  assert.match(patched, /codexLinuxFarfieldSetDraft/);
   assert.match(patched, /thread-follower-append-queued-follow-up-response/);
-  assert.match(patched, /thread-follower-read-composer-draft-response/);
-  assert.match(patched, /thread-follower-set-composer-draft-response/);
   assert.match(patched, /thread-follower-type-and-submit-message-response/);
   assert.doesNotMatch(patched, /case`thread-follower-refresh-conversation-request`/);
   assert.doesNotMatch(patched, /thread-follower-refresh-conversation-response/);
@@ -92,46 +101,41 @@ test("bridges acknowledged per-thread queue, draft, and takeover requests", () =
   assert.match(patched, /codexLinuxFarfieldTakeoverSubmitHandlers/);
   assert.match(patched, /await new Promise\(e=>setTimeout\(e,50\)\)/);
   assert.match(patched, /result:\{conversationId:t,submitted:!0\}/);
-  assert.match(patched, /await mu\(e,x\.QUEUED_FOLLOW_UPS,s\)/);
-  assert.match(patched, /some\(e=>e\.id===n\.id\)/);
-  assert.match(patched, /thread-queued-followups-changed/);
-  assert.doesNotMatch(
-    requestCaseSource(patched, "thread-follower-read-composer-draft"),
-    /assert-thread-follower-owner-for-host/,
-  );
-  assert.doesNotMatch(
-    requestCaseSource(patched, "thread-follower-set-composer-draft"),
-    /assert-thread-follower-owner-for-host/,
-  );
-  assert.equal(applyFarfieldBridgePatch(patched), patched);
+  assert.equal(applyFarfieldDispatcherPatch(patched), patched);
 });
 
-test("registers the native composer and publishes local draft changes", () => {
+test("registers the native queue hook in its current upstream bundle", () => {
+  const patched = applyFarfieldQueuePatch(queueNeedle);
+
+  assert.match(patched, /codexLinuxFarfieldQueue/);
+  assert.match(patched, /codexLinuxFarfieldAppendQueuedFollowUp/);
+  assert.match(patched, /await pe\(t,Zn\.QUEUED_FOLLOW_UPS,c\)/);
+  assert.match(patched, /some\(e=>e\.id===r\.id\)/);
+  assert.match(patched, /thread-queued-followups-changed/);
+  assert.equal(applyFarfieldQueuePatch(patched), patched);
+});
+
+test("registers native side-task and takeover handlers without draft synchronization", () => {
   const patched = applyFarfieldComposerPatch(
     [
       composerRegistrationNeedle,
-      composerInputNeedle,
-      `function uM(){let T={};${composerQueuedFollowUpNeedle}};Js=async(e={})=>{uM({${composerTurnStartedNeedle},options:e})},Ys=Yc(Js)`,
+      `function uM(){let T={};${composerQueuedFollowUpNeedle}};As=async(e={})=>{uM({${composerTurnStartedNeedle},options:e})},js=Pa(As)`,
       composerSubmitRegistrationNeedle,
     ].join(";")
   );
 
   assert.match(patched, /codexLinuxFarfieldComposer/);
   assert.match(patched, /codexLinuxFarfieldRegisterComposer/);
-  assert.match(patched, /codexLinuxFarfieldPublishLocalDraft/);
-  assert.match(patched, /In\.getPersistedText\(\)/);
-  assert.match(patched, /\.setText/);
-  assert.match(patched, /localStorage\.setItem/);
-  assert.match(patched, /thread-composer-draft-changed/);
-  assert.match(patched, /setTimeout/);
+  assert.doesNotMatch(patched, /localStorage/);
+  assert.doesNotMatch(patched, /thread-composer-draft-changed/);
   assert.match(patched, /codexLinuxFarfieldRegisterTakeoverSubmit/);
-  assert.match(patched, /In\.setText\(e\)/);
+  assert.match(patched, /Fn\.setText\(e\)/);
   assert.match(
     patched,
-    /await Ys\(\{promptRawOverride:e,persistedPromptRawOverride:e,focusComposerAfterSubmit:!0,onLocalTurnStarted:e=>\{t=e\},onQueuedFollowUp:e=>\{t=\{threadId:K,queuedFollowUpId:e\}\}\}\)/,
+    /await js\(\{promptRawOverride:e,persistedPromptRawOverride:e,focusComposerAfterSubmit:!0,onLocalTurnStarted:e=>\{t=e\},onQueuedFollowUp:e=>\{t=\{threadId:V,queuedFollowUpId:e\}\}\}\)/,
   );
   assert.ok(
-    patched.indexOf("Ys=Yc(Js)") <
+    patched.indexOf("js=Pa(As)") <
       patched.indexOf("codexLinuxFarfieldTakeoverSubmitRegistration"),
   );
   assert.equal(applyFarfieldComposerPatch(patched), patched);
@@ -141,20 +145,19 @@ test("acknowledges takeover only after the native composer starts or queues it",
   const patched = applyFarfieldComposerPatch(
     [
       composerRegistrationNeedle,
-      composerInputNeedle,
-      `function uM(){let T={};${composerQueuedFollowUpNeedle}};Js=async(e={})=>{uM({${composerTurnStartedNeedle},options:e})},Ys=Yc(Js)`,
+      `function uM(){let T={};${composerQueuedFollowUpNeedle}};As=async(e={})=>{uM({${composerTurnStartedNeedle},options:e})},js=Pa(As)`,
       composerSubmitRegistrationNeedle,
     ].join(";"),
   );
 
   assert.match(
     patched,
-    /if\(K==null\|\|Us\.type!==`local`\|\|fs!=null&&fs!==`empty-message`\)return/,
+    /if\(V==null\|\|Ts\.type!==`local`\|\|Zo!=null&&Zo!==`empty-message`\)return/,
   );
   assert.doesNotMatch(patched, /ys!==`submit`/);
   assert.match(patched, /e\.onLocalTurnStarted\?\.\(t\)/);
   assert.match(patched, /onLocalTurnStarted:e=>\{t=e\}/);
-  assert.match(patched, /onQueuedFollowUp:e=>\{t=\{threadId:K,queuedFollowUpId:e\}\}/);
+  assert.match(patched, /onQueuedFollowUp:e=>\{t=\{threadId:V,queuedFollowUpId:e\}\}/);
   assert.match(patched, /T\.onQueuedFollowUp\?\.\(e\)/);
   assert.match(
     patched,
@@ -193,7 +196,7 @@ test("forwards composer requests to the primary renderer and refreshes all app w
   );
   assert.match(
     patched,
-    /`thread-follower-set-composer-draft`,`thread-follower-type-and-submit-message`\]\)r\.add\(t\.addRequestHandler\(n,a,/,
+    /`thread-follower-append-queued-follow-up`,`thread-follower-type-and-submit-message`\]\)r\.add\(t\.addRequestHandler\(n,a,/,
   );
   assert.match(
     patched,
@@ -207,8 +210,9 @@ test("forwards composer requests to the primary renderer and refreshes all app w
   assert.doesNotMatch(patched, /thread-follower-refresh-conversation-response/);
   assert.match(
     patched,
-    /`thread-follower-read-composer-draft`/,
+    /`thread-follower-open-side-chat`/,
   );
+  assert.doesNotMatch(patched, /composer-draft/);
   assert.match(patched, /webcontents-destroyed/);
   assert.equal(applyFarfieldMainProcessPatch(patched), patched);
 });
@@ -232,7 +236,11 @@ test("serializes Linux IPC router startup across Desktop windows", () => {
 
   assert.match(patched, /codexLinuxFarfieldRouter/);
   assert.match(patched, /codexLinuxFarfieldRouterStartPromise/);
-  assert.match(patched, /await globalThis\.codexLinuxFarfieldRouterStartPromise/);
+  assert.match(patched, /try\{await t\}/);
+  assert.match(
+    patched,
+    /finally\{globalThis\.codexLinuxFarfieldRouterStartPromise===t&&\(globalThis\.codexLinuxFarfieldRouterStartPromise=null\)\}/,
+  );
   assert.match(patched, /"thread-follower-type-and-submit-message":1/);
   assert.equal(applyFarfieldRouterPatch(patched), patched);
 });
@@ -261,13 +269,59 @@ test("patches exactly one extracted IPC router bundle", () => {
   }
 });
 
+test("accepts a build only when every Farfield patch applied", () => {
+  assert.deepEqual(verifyFarfieldPatchReport(reportWith()), {
+    enabled: true,
+    verifiedPatchCount: 6,
+  });
+});
+
+test("accepts idempotent Farfield patches reported as already applied", () => {
+  assert.deepEqual(
+    verifyFarfieldPatchReport(
+      reportWith({ "desktop-farfield-router-startup": "already-applied" }),
+    ),
+    { enabled: true, verifiedPatchCount: 6 },
+  );
+});
+
+test("fails when an enabled Farfield patch is skipped", () => {
+  assert.throws(
+    () =>
+      verifyFarfieldPatchReport(
+        reportWith({ "desktop-farfield-native-queue": "skipped-optional" }),
+      ),
+    /desktop-farfield-native-queue.*skipped-optional/,
+  );
+});
+
+test("fails when an enabled Farfield patch is absent from the report", () => {
+  const report = reportWith();
+  report.patches = report.patches.filter(
+    (patch) => !patch.name.endsWith(":desktop-farfield-composer-registration"),
+  );
+
+  assert.throws(
+    () => verifyFarfieldPatchReport(report),
+    /desktop-farfield-composer-registration.*missing/,
+  );
+});
+
+test("does not gate builds where Farfield is disabled", () => {
+  assert.deepEqual(
+    verifyFarfieldPatchReport({ enabledFeatures: [], patches: [] }),
+    { enabled: false, verifiedPatchCount: 0 },
+  );
+});
+
 test("warns and leaves a drifted bundle unchanged", () => {
   const warnings = [];
   const originalWarn = console.warn;
   console.warn = (message) => warnings.push(message);
   try {
     const source = "current-matching-asset-with-upstream-drift";
-    assert.equal(applyFarfieldBridgePatch(source), source);
+    assert.equal(applyFarfieldDispatcherPatch(source), source);
+    assert.equal(applyFarfieldQueuePatch(source), source);
     assert.equal(applyFarfieldComposerPatch(source), source);
     assert.equal(applyFarfieldMainProcessPatch(source), source);
     assert.equal(applyFarfieldProtocolPatch(source), source);
@@ -275,7 +329,7 @@ test("warns and leaves a drifted bundle unchanged", () => {
   } finally {
     console.warn = originalWarn;
   }
-  assert.equal(warnings.length, 5);
+  assert.equal(warnings.length, 6);
   assert.ok(warnings.every((warning) => warning.includes("WARN:")));
 });
 
@@ -296,30 +350,33 @@ test("registers optional webview descriptors only when enabled", () => {
     const descriptors = loadLinuxFeaturePatchDescriptors({
       featuresRoot: path.resolve(__dirname, ".."),
     });
-    assert.equal(descriptors.length, 5);
+    assert.equal(descriptors.length, 6);
     assert.equal(descriptors[0].phase, "main-bundle");
     assert.equal(descriptors[1].phase, "extracted-app:post-webview");
     assert.ok(descriptors.slice(2).every((descriptor) => descriptor.phase === "webview-asset"));
     assert.ok(descriptors.every((descriptor) => descriptor.ciPolicy === "optional"));
     assert.ok(
-      descriptors[2].pattern.test(
-        "app-initial~app-main~new-thread-panel-page~onboarding-page~appgen-library-page~hotkey-windo~d4kxte0o-BsjKAgmz.js",
-      ),
+      descriptors[2].pattern.test("app-initial~app-main~hotkey-window-new-thread-page~hotkey-window-home-page~composer-utility-bar-D9zyQF1n.js"),
     );
     assert.equal(
       descriptors[2].pattern.test(
-        "app-initial~app-main~new-thread-panel-page~onboarding-page~appgen-library-page~hotkey-windo~nrw3o0ql-BmMR41j4.js",
+        "app-initial~app-main~new-thread-panel-page~onboarding-page~appgen-library-page~hotkey-windo~nrw3o0ql-CI1_Z0oj.js",
       ),
       false,
     );
-    assert.ok(descriptors[3].pattern.test("app-initial~app-main~page-Bca1Wu86.js"));
+    assert.ok(descriptors[3].pattern.test("app-initial~app-main~page-Cmd9LUYY.js"));
     assert.ok(
       descriptors[4].pattern.test(
+        "app-initial~app-main~new-thread-panel-page~onboarding-page~appgen-library-page~hotkey-windo~nrw3o0ql-CI1_Z0oj.js",
+      ),
+    );
+    assert.ok(
+      descriptors[5].pattern.test(
         "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-DRU9Ekz0.js",
       ),
     );
     assert.equal(
-      descriptors[4].pattern.test(
+      descriptors[5].pattern.test(
         "app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~lhgjoyjn-CMTECkzu.js",
       ),
       false,

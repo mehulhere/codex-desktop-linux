@@ -7,7 +7,6 @@ requests for:
 - navigating to a task, placing the exact follower prompt in its native
   composer, and invoking Desktop's normal submit action;
 - appending one message to a task's native queued follow-ups;
-- reading and updating a persistent per-task composer draft; and
 - opening Desktop's native temporary side task;
 - rehydrating the open native task after its rollout becomes terminal.
 
@@ -31,16 +30,10 @@ state, publish `thread-queued-followups-changed`, and return the accepted
 per-task queue. A follower never has to replace queues belonging to other
 tasks.
 
-Composer drafts are stored per conversation in the Desktop renderer and use
-monotonic revisions. The mounted native composer and remote follower publish
-through the same draft state. Stale revisions return the current authoritative
-draft instead of overwriting it. `thread-composer-draft-changed` broadcasts
-notify followers after accepted local or remote changes.
-
-Queue and side-task requests still enforce Desktop ownership. Draft requests
-use the renderer's persistent per-task draft store even when that task is not
-currently mounted. The feature does not synchronize queued-message editing or
-deletion beyond Desktop's existing queue-state behavior.
+Queue and side-task requests still enforce Desktop ownership. Composer drafts
+remain local to the surface where they were typed and are never copied between
+Desktop and Farfield. The feature does not synchronize queued-message editing
+or deletion beyond Desktop's existing queue-state behavior.
 
 Enable it only in the gitignored local feature config before rebuilding:
 
@@ -57,6 +50,8 @@ node --test linux-features/farfield-bridge/test.js
 node --test scripts/patch-linux-window-ui.test.js
 ```
 
-All five patch descriptors are optional and idempotent. Each skips with a
+All six patch descriptors are optional and idempotent. Each skips with a
 drift report if the current Desktop bundle no longer exposes the required
-integration needles.
+integration needles. The safe candidate rebuild additionally treats any
+missing or skipped Farfield descriptor as a build failure whenever this
+feature is enabled, preventing an incomplete bridge from being staged.

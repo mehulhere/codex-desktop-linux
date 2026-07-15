@@ -7,17 +7,18 @@ const BRIDGE_MARKER = "codexLinuxFarfieldBridge";
 const COMPOSER_MARKER = "codexLinuxFarfieldComposer";
 const MAIN_PROCESS_MARKER = "codexLinuxFarfieldMainProcess";
 const PROTOCOL_MARKER = "codexLinuxFarfieldProtocol";
+const QUEUE_MARKER = "codexLinuxFarfieldQueue";
 const ROUTER_MARKER = "codexLinuxFarfieldRouter";
 
 const ROUTER_NEEDLE =
-  'async connect(){if(this.disposed)return;try{await this.routerManager.startRouterIfNeeded()}catch(e){this.logger.warning(`Unable to start router if needed`,{safe:{},sensitive:{error:e}})}let e=N7();';
+  'async connect(){if(this.disposed)return;try{await this.routerManager.startRouterIfNeeded()}catch(e){this.logger.warning(`Unable to start router if needed`,{safe:{},sensitive:{error:e}})}let e=F7();';
 const ROUTER_REPLACEMENT =
-  'async connect(){if(this.disposed)return;try{globalThis.codexLinuxFarfieldRouterStartPromise??=this.routerManager.startRouterIfNeeded(),await globalThis.codexLinuxFarfieldRouterStartPromise}catch(e){globalThis.codexLinuxFarfieldRouterStartPromise=null,this.logger.warning(`Unable to start router if needed`,{safe:{},sensitive:{error:e}})}let e=N7();';
+  'async connect(){if(this.disposed)return;let t=globalThis.codexLinuxFarfieldRouterStartPromise??=this.routerManager.startRouterIfNeeded();try{await t}catch(e){this.logger.warning(`Unable to start router if needed`,{safe:{},sensitive:{error:e}})}finally{globalThis.codexLinuxFarfieldRouterStartPromise===t&&(globalThis.codexLinuxFarfieldRouterStartPromise=null)}let e=F7();';
 
 const MAIN_METHOD_MAP_NEEDLE =
   '"thread-follower-set-queued-follow-ups-state":`thread-follower-set-queued-follow-ups-state-request`},G$=class{';
 const MAIN_METHOD_MAP_REPLACEMENT =
-  '"thread-follower-set-queued-follow-ups-state":`thread-follower-set-queued-follow-ups-state-request`,"thread-follower-open-side-chat":`thread-follower-open-side-chat-request`,"thread-follower-append-queued-follow-up":`thread-follower-append-queued-follow-up-request`,"thread-follower-read-composer-draft":`thread-follower-read-composer-draft-request`,"thread-follower-set-composer-draft":`thread-follower-set-composer-draft-request`,"thread-follower-type-and-submit-message":`thread-follower-type-and-submit-message-request`},G$=class{';
+  '"thread-follower-set-queued-follow-ups-state":`thread-follower-set-queued-follow-ups-state-request`,"thread-follower-open-side-chat":`thread-follower-open-side-chat-request`,"thread-follower-append-queued-follow-up":`thread-follower-append-queued-follow-up-request`,"thread-follower-type-and-submit-message":`thread-follower-type-and-submit-message-request`},G$=class{';
 const MAIN_PENDING_MAP_NEEDLE =
   'pendingThreadFollowerSetQueuedFollowUpsStateRequests=new Map;pendingThreadRoleRequests=new Map;';
 const MAIN_PENDING_MAP_REPLACEMENT =
@@ -29,14 +30,14 @@ const MAIN_REQUEST_REPLACEMENT =
 const MAIN_RESPONSE_CASE_NEEDLE =
   'case`thread-follower-set-queued-follow-ups-state-response`:this.handleThreadFollowerSetQueuedFollowUpsStateResponse(e,t);break;case`thread-role-response`:';
 const MAIN_RESPONSE_CASE_REPLACEMENT =
-  'case`thread-follower-set-queued-follow-ups-state-response`:this.handleThreadFollowerSetQueuedFollowUpsStateResponse(e,t);break;case`thread-follower-open-side-chat-response`:case`thread-follower-append-queued-follow-up-response`:case`thread-follower-read-composer-draft-response`:case`thread-follower-set-composer-draft-response`:case`thread-follower-type-and-submit-message-response`:this.handleCodexLinuxFarfieldResponse(e,t);break;case`thread-role-response`:';
+  'case`thread-follower-set-queued-follow-ups-state-response`:this.handleThreadFollowerSetQueuedFollowUpsStateResponse(e,t);break;case`thread-follower-open-side-chat-response`:case`thread-follower-append-queued-follow-up-response`:case`thread-follower-type-and-submit-message-response`:this.handleCodexLinuxFarfieldResponse(e,t);break;case`thread-role-response`:';
 const MAIN_RESPONSE_NEEDLE = 'handleThreadRoleResponse(e,t){';
 const MAIN_RESPONSE_REPLACEMENT =
   'handleCodexLinuxFarfieldResponse(e,t){let n=String(t.requestId),r=this.pendingCodexLinuxFarfieldRequests.get(n);if(!r||r.originId!==e.id)return;if(this.pendingCodexLinuxFarfieldRequests.delete(n),clearTimeout(r.timeout),t.error){r.reject(Error(t.error));return}if(!t.result){r.reject(Error(`Missing Codex Linux Farfield response`));return}r.resolve(t.result)}handleThreadRoleResponse(e,t){';
 const MAIN_REGISTRATION_NEEDLE =
   'r.add(t.addRequestHandler(`thread-follower-set-queued-follow-ups-state`,i,async t=>this.messageHandler.handleThreadFollowerSetQueuedFollowUpsStateRequest(e,t))),r.add(()=>t.dispose())';
 const MAIN_REGISTRATION_REPLACEMENT =
-  'r.add(t.addRequestHandler(`thread-follower-set-queued-follow-ups-state`,i,async t=>this.messageHandler.handleThreadFollowerSetQueuedFollowUpsStateRequest(e,t)));let a=async()=>this.options.windowManager.getPrimaryWindow()?.webContents.id===e.id;for(let n of[`thread-follower-open-side-chat`,`thread-follower-append-queued-follow-up`,`thread-follower-read-composer-draft`,`thread-follower-set-composer-draft`,`thread-follower-type-and-submit-message`])r.add(t.addRequestHandler(n,a,async t=>this.messageHandler.handleCodexLinuxFarfieldRequest(e,t)));r.add(t.addRequestHandler(`thread-follower-refresh-conversation`,async()=>!0,async t=>{let{conversationId:n}=t.params;if(typeof n!==`string`||n.length===0)throw Error(`Refresh conversationId is required.`);let r=c.BrowserWindow.getAllWindows().filter(n=>!n.isDestroyed()&&this.options.windowManager.isAppServiceWindow(n));if(r.length===0)throw Error(`No Desktop app window is available for refresh.`);setTimeout(()=>{for(let t of r)t.isDestroyed()||t.webContents.isDestroyed()||t.webContents.reload()},0);return{conversationId:n,refreshScheduled:!0}}));r.add(()=>t.dispose())';
+  'r.add(t.addRequestHandler(`thread-follower-set-queued-follow-ups-state`,i,async t=>this.messageHandler.handleThreadFollowerSetQueuedFollowUpsStateRequest(e,t)));let a=async()=>this.options.windowManager.getPrimaryWindow()?.webContents.id===e.id;for(let n of[`thread-follower-open-side-chat`,`thread-follower-append-queued-follow-up`,`thread-follower-type-and-submit-message`])r.add(t.addRequestHandler(n,a,async t=>this.messageHandler.handleCodexLinuxFarfieldRequest(e,t)));r.add(t.addRequestHandler(`thread-follower-refresh-conversation`,async()=>!0,async t=>{let{conversationId:n}=t.params;if(typeof n!==`string`||n.length===0)throw Error(`Refresh conversationId is required.`);let r=c.BrowserWindow.getAllWindows().filter(n=>!n.isDestroyed()&&this.options.windowManager.isAppServiceWindow(n));if(r.length===0)throw Error(`No Desktop app window is available for refresh.`);setTimeout(()=>{for(let t of r)t.isDestroyed()||t.webContents.isDestroyed()||t.webContents.reload()},0);return{conversationId:n,refreshScheduled:!0}}));r.add(()=>t.dispose())';
 const MAIN_REFRESH_PREDICATE_NEEDLE =
   'addRequestHandler(`thread-follower-refresh-conversation`,a,async t=>';
 const MAIN_REFRESH_PREDICATE_REPLACEMENT =
@@ -49,39 +50,36 @@ const MAIN_REFRESH_HANDLER_REPLACEMENT =
 const VERSION_NEEDLE =
   '"thread-follower-set-queued-follow-ups-state":1,"thread-queued-followups-changed":1';
 const VERSION_REPLACEMENT =
-  '"thread-follower-set-queued-follow-ups-state":1,"thread-follower-open-side-chat":1,"thread-follower-append-queued-follow-up":1,"thread-follower-read-composer-draft":1,"thread-follower-set-composer-draft":1,"thread-follower-type-and-submit-message":1,"thread-follower-refresh-conversation":1,"thread-composer-draft-changed":1,"thread-queued-followups-changed":1';
+  '"thread-follower-set-queued-follow-ups-state":1,"thread-follower-open-side-chat":1,"thread-follower-append-queued-follow-up":1,"thread-follower-type-and-submit-message":1,"thread-follower-refresh-conversation":1,"thread-queued-followups-changed":1';
 
 const DISPATCHER_NEEDLE =
-  'case`thread-follower-set-queued-follow-ups-state-request`:try{let{conversationId:t,state:n}=e.params;await Oc(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t}),await mu(r,x.QUEUED_FOLLOW_UPS,n),um.dispatchMessage(`thread-queued-followups-changed`,{conversationId:t,messages:n[t]??[]}),um.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,result:{ok:!0}})}catch(t){let n=t;um.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-role-request`:';
+  'case`thread-follower-set-queued-follow-ups-state-request`:try{let{conversationId:t,state:n}=e.params;await b(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t}),await Ve(r,Lc.QUEUED_FOLLOW_UPS,n),il.dispatchMessage(`thread-queued-followups-changed`,{conversationId:t,messages:n[t]??[]}),il.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,result:{ok:!0}})}catch(t){let n=t;il.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-role-request`:';
 const DISPATCHER_REPLACEMENT =
-  'case`thread-follower-set-queued-follow-ups-state-request`:try{let{conversationId:t,state:n}=e.params;await Oc(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t}),await mu(r,x.QUEUED_FOLLOW_UPS,n),um.dispatchMessage(`thread-queued-followups-changed`,{conversationId:t,messages:n[t]??[]}),um.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,result:{ok:!0}})}catch(t){let n=t;um.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-follower-open-side-chat-request`:try{let{conversationId:t}=e.params;await Oc(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t});let n=globalThis.codexLinuxFarfieldSideChatHandlers?.get(t);if(n==null)throw Error(`Side task is unavailable for this conversation.`);let r=await n();if(r==null)throw Error(`Side task could not be opened.`);um.dispatchMessage(`thread-follower-open-side-chat-response`,{requestId:e.requestId,result:{conversationId:r}})}catch(t){let n=t;um.dispatchMessage(`thread-follower-open-side-chat-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-follower-append-queued-follow-up-request`:try{let{conversationId:t,message:n}=e.params;await Oc(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t});let r=globalThis.codexLinuxFarfieldAppendQueuedFollowUp;if(r==null)throw Error(`Native queued follow-ups are unavailable.`);let i=await r(t,n);um.dispatchMessage(`thread-follower-append-queued-follow-up-response`,{requestId:e.requestId,result:i})}catch(t){let n=t;um.dispatchMessage(`thread-follower-append-queued-follow-up-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-follower-read-composer-draft-request`:try{let{conversationId:t}=e.params,n=globalThis.codexLinuxFarfieldReadDraft;if(n==null)throw Error(`Shared composer drafts are unavailable.`);um.dispatchMessage(`thread-follower-read-composer-draft-response`,{requestId:e.requestId,result:{draft:n(t)}})}catch(t){let n=t;um.dispatchMessage(`thread-follower-read-composer-draft-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-follower-set-composer-draft-request`:try{let{conversationId:t,draft:n}=e.params,r=globalThis.codexLinuxFarfieldSetDraft;if(r==null)throw Error(`Shared composer drafts are unavailable.`);um.dispatchMessage(`thread-follower-set-composer-draft-response`,{requestId:e.requestId,result:{draft:r(t,n)}})}catch(t){let n=t;um.dispatchMessage(`thread-follower-set-composer-draft-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-follower-type-and-submit-message-request`:try{let{conversationId:t,text:n}=e.params;if(typeof t!==`string`||t.length===0)throw Error(`Takeover conversationId is required.`);if(typeof n!==`string`||n.trim().length===0)throw Error(`Takeover message text is required.`);um.dispatchHostMessage({type:`navigate-to-route`,path:`/local/${encodeURIComponent(t)}`,state:{focusComposerNonce:Date.now()}});let r=Date.now()+1e4,i=null;for(;Date.now()<r;){if(i=globalThis.codexLinuxFarfieldTakeoverSubmitHandlers?.get(t),i!=null)break;await new Promise(e=>setTimeout(e,50))}if(i==null)throw Error(`Native composer did not become ready for this conversation.`);await i(n),um.dispatchMessage(`thread-follower-type-and-submit-message-response`,{requestId:e.requestId,result:{conversationId:t,submitted:!0}})}catch(t){let n=t;um.dispatchMessage(`thread-follower-type-and-submit-message-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-role-request`:';
+  'case`thread-follower-set-queued-follow-ups-state-request`:try{let{conversationId:t,state:n}=e.params;await b(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t}),await Ve(r,Lc.QUEUED_FOLLOW_UPS,n),il.dispatchMessage(`thread-queued-followups-changed`,{conversationId:t,messages:n[t]??[]}),il.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,result:{ok:!0}})}catch(t){let n=t;il.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-follower-open-side-chat-request`:try{let{conversationId:t}=e.params;await b(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t});let n=globalThis.codexLinuxFarfieldSideChatHandlers?.get(t);if(n==null)throw Error(`Side task is unavailable for this conversation.`);let r=await n();if(r==null)throw Error(`Side task could not be opened.`);il.dispatchMessage(`thread-follower-open-side-chat-response`,{requestId:e.requestId,result:{conversationId:r}})}catch(t){let n=t;il.dispatchMessage(`thread-follower-open-side-chat-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-follower-append-queued-follow-up-request`:try{let{conversationId:t,message:n}=e.params;await b(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t});let r=globalThis.codexLinuxFarfieldAppendQueuedFollowUp;if(r==null)throw Error(`Native queued follow-ups are unavailable.`);let i=await r(t,n);il.dispatchMessage(`thread-follower-append-queued-follow-up-response`,{requestId:e.requestId,result:i})}catch(t){let n=t;il.dispatchMessage(`thread-follower-append-queued-follow-up-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-follower-type-and-submit-message-request`:try{let{conversationId:t,text:n}=e.params;if(typeof t!==`string`||t.length===0)throw Error(`Takeover conversationId is required.`);if(typeof n!==`string`||n.trim().length===0)throw Error(`Takeover message text is required.`);il.dispatchHostMessage({type:`navigate-to-route`,path:`/local/${encodeURIComponent(t)}`,state:{focusComposerNonce:Date.now()}});let r=Date.now()+1e4,i=null;for(;Date.now()<r;){if(i=globalThis.codexLinuxFarfieldTakeoverSubmitHandlers?.get(t),i!=null)break;await new Promise(e=>setTimeout(e,50))}if(i==null)throw Error(`Native composer did not become ready for this conversation.`);await i(n),il.dispatchMessage(`thread-follower-type-and-submit-message-response`,{requestId:e.requestId,result:{conversationId:t,submitted:!0}})}catch(t){let n=t;il.dispatchMessage(`thread-follower-type-and-submit-message-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-role-request`:';
 
 const QUEUE_NEEDLE =
-  'function fhe(){let e=q(J),t=Eh(),{data:n}=Nu(x.QUEUED_FOLLOW_UPS)';
+  'function Sat(e){let t=$r(br),n=mh(e),{data:r,isLoading:i}=f(Zn.QUEUED_FOLLOW_UPS),a=Ct(),o=kn(`get-global-state`,{key:Zn.QUEUED_FOLLOW_UPS}),s=(0,I5.useRef)({}),c=(0,I5.useRef)(0),l=(0,I5.useRef)(0),u=(0,I5.useRef)([]),d=(0,I5.useRef)(!1);(0,I5.useEffect)';
 const QUEUE_REPLACEMENT =
-  'function fhe(){let e=q(J),t=Eh(),{data:n}=Nu(x.QUEUED_FOLLOW_UPS),codexLinuxFarfieldQueueRegistration=(0,t4.useEffect)(()=>{let t=async(t,n)=>{let r=i.current,a=r[t]??[],o=a.some(e=>e.id===n.id)?a:[...a,n],s={...r,[t]:o};return i.current=s,await mu(e,x.QUEUED_FOLLOW_UPS,s),e.get(Ti,t)?.role===`owner`&&um.dispatchMessage(`thread-queued-followups-changed`,{conversationId:t,messages:o}),{messages:o}};return globalThis.codexLinuxFarfieldAppendQueuedFollowUp=t,()=>{globalThis.codexLinuxFarfieldAppendQueuedFollowUp===t&&delete globalThis.codexLinuxFarfieldAppendQueuedFollowUp}},[e])';
+  'function Sat(e){let t=$r(br),n=mh(e),{data:r,isLoading:i}=f(Zn.QUEUED_FOLLOW_UPS),a=Ct(),o=kn(`get-global-state`,{key:Zn.QUEUED_FOLLOW_UPS}),s=(0,I5.useRef)({}),c=(0,I5.useRef)(0),l=(0,I5.useRef)(0),u=(0,I5.useRef)([]),d=(0,I5.useRef)(!1),codexLinuxFarfieldQueueRegistration=(0,I5.useEffect)(()=>{let e=async(e,r)=>{let i=s.current,a=i[e]??[],o=a.some(e=>e.id===r.id)?a:[...a,r],c={...i,[e]:o};return s.current=c,await pe(t,Zn.QUEUED_FOLLOW_UPS,c),n.getStreamRole(e)?.role===`owner`&&sr.dispatchMessage(`thread-queued-followups-changed`,{conversationId:e,messages:o}),{messages:o}};return globalThis.codexLinuxFarfieldAppendQueuedFollowUp=e,()=>{globalThis.codexLinuxFarfieldAppendQueuedFollowUp===e&&delete globalThis.codexLinuxFarfieldAppendQueuedFollowUp}},[t,n]);(0,I5.useEffect)';
 
 const COMPOSER_REGISTRATION_NEEDLE =
-  ',{onOpen:Fs,onOpenQuickChat:Is,onOpenSideChat:Ls}=gq({scope:B,conversationId:K,';
+  ',Ls=Pa(async()=>{try{await _s(null)}catch(e){gs(e)}}),zs=Vz({conversationId:V,';
 const COMPOSER_REGISTRATION_REPLACEMENT =
-  ',codexLinuxFarfieldComposerRegistration=(0,wq.useEffect)(()=>{if(K==null)return;let e=()=>Ps(null);return globalThis.codexLinuxFarfieldRegisterComposer(K,In,e)},[K,In,Ps]),{onOpen:Fs,onOpenQuickChat:Is,onOpenSideChat:Ls}=gq({scope:B,conversationId:K,';
-const COMPOSER_INPUT_NEEDLE = 'onUserInput:()=>{Hi(B)}';
-const COMPOSER_INPUT_REPLACEMENT =
-  'onUserInput:()=>{Hi(B),K!=null&&globalThis.codexLinuxFarfieldPublishLocalDraft?.(K,In.getPersistedText())}';
+  ',Ls=Pa(async()=>{try{await _s(null)}catch(e){gs(e)}}),codexLinuxFarfieldComposerRegistration=(0,XY.useEffect)(()=>{if(V==null)return;return globalThis.codexLinuxFarfieldRegisterComposer(V,Fn,Ls)},[V,Fn,Ls]),zs=Vz({conversationId:V,';
 const COMPOSER_SUBMIT_REGISTRATION_NEEDLE =
-  '(0,wq.useEffect)(()=>{},[null,In])';
+  '(0,XY.useEffect)(()=>{},[null,Fn])';
 const COMPOSER_SUBMIT_REGISTRATION_REPLACEMENT =
-  'let codexLinuxFarfieldTakeoverSubmitRegistration=(0,wq.useEffect)(()=>{if(K==null||Us.type!==`local`||fs!=null&&fs!==`empty-message`)return;let e=async e=>{In.setText(e);let t=null;await Ys({promptRawOverride:e,persistedPromptRawOverride:e,focusComposerAfterSubmit:!0,onLocalTurnStarted:e=>{t=e},onQueuedFollowUp:e=>{t={threadId:K,queuedFollowUpId:e}}});if(t==null)throw Error(`Native composer did not accept the takeover message.`);return t};return globalThis.codexLinuxFarfieldRegisterTakeoverSubmit(K,e)},[K,In,Ys,Us.type,fs])';
+  'let codexLinuxFarfieldTakeoverSubmitRegistration=(0,XY.useEffect)(()=>{if(V==null||Ts.type!==`local`||Zo!=null&&Zo!==`empty-message`)return;let e=async e=>{Fn.setText(e);let t=null;await js({promptRawOverride:e,persistedPromptRawOverride:e,focusComposerAfterSubmit:!0,onLocalTurnStarted:e=>{t=e},onQueuedFollowUp:e=>{t={threadId:V,queuedFollowUpId:e}}});if(t==null)throw Error(`Native composer did not accept the takeover message.`);return t};return globalThis.codexLinuxFarfieldRegisterTakeoverSubmit(V,e)},[V,Fn,js,Ts.type,Zo])';
 const COMPOSER_TURN_STARTED_NEEDLE =
-  'onLocalTurnStarted:e=>{xn!=null&&e.threadId!=null&&e.turnId!=null&&HS(B,xn.itemId,e.threadId,e.turnId)},openSideChatFromComposer:Ps';
+  'onLocalTurnStarted:e=>{xn!=null&&e.threadId!=null&&e.turnId!=null&&Vb(N,xn.itemId,e.threadId,e.turnId)},openSideChatFromComposer:_s';
 const COMPOSER_TURN_STARTED_REPLACEMENT =
-  'onLocalTurnStarted:t=>{xn!=null&&t.threadId!=null&&t.turnId!=null&&HS(B,xn.itemId,t.threadId,t.turnId),e.onLocalTurnStarted?.(t)},openSideChatFromComposer:Ps';
+  'onLocalTurnStarted:t=>{xn!=null&&t.threadId!=null&&t.turnId!=null&&Vb(N,xn.itemId,t.threadId,t.turnId),e.onLocalTurnStarted?.(t)},openSideChatFromComposer:_s';
 const COMPOSER_QUEUED_FOLLOW_UP_NEEDLE =
-  'if(J){vC(A,{result:Ni.CODEX_REMOTE_SSH_MESSAGE_RESULT_QUEUED,submitAction:X}),u(k.enqueue({text:q,context:oe,cwd:M})?.id??null),n(),N(!1),U&&c();return}';
+  'if(ie){yT(A,{result:wo.CODEX_REMOTE_SSH_MESSAGE_RESULT_QUEUED,submitAction:q}),u(k.enqueue({text:re,context:ue,cwd:M})?.id??null),n(),N(!1),U&&c();return}';
 const COMPOSER_QUEUED_FOLLOW_UP_REPLACEMENT =
-  'if(J){vC(A,{result:Ni.CODEX_REMOTE_SSH_MESSAGE_RESULT_QUEUED,submitAction:X});let e=k.enqueue({text:q,context:oe,cwd:M})?.id??null;u(e),e!=null&&T.onQueuedFollowUp?.(e),n(),N(!1),U&&c();return}';
+  'if(ie){yT(A,{result:wo.CODEX_REMOTE_SSH_MESSAGE_RESULT_QUEUED,submitAction:q});let e=k.enqueue({text:re,context:ue,cwd:M})?.id??null;u(e),e!=null&&T.onQueuedFollowUp?.(e),n(),N(!1),U&&c();return}';
 
-const COMPOSER_BOOTSTRAP = String.raw`const codexLinuxFarfieldComposer=!0;(()=>{if(globalThis.codexLinuxFarfieldDraftBridgeInitialized)return;globalThis.codexLinuxFarfieldDraftBridgeInitialized=!0;let e="codex-linux-farfield-composer-drafts-v1",t=new Map,r="desktop:"+crypto.randomUUID(),i=()=>{let t=localStorage.getItem(e);if(t==null)return{};try{let e=JSON.parse(t);return e&&typeof e==="object"&&!Array.isArray(e)?e:{}}catch(e){return console.error("[Farfield draft bridge] Could not parse persisted drafts",e),{}}},a=i(),o=()=>{localStorage.setItem(e,JSON.stringify(a))},s=e=>{let t=a[e];return t&&typeof t.text==="string"&&Number.isSafeInteger(t.revision)&&t.revision>=0&&typeof t.source==="string"&&t.source.length>0?t:{text:"",revision:0,source:"desktop"}},c=(e,t)=>{if(typeof e!=="string"||e.length===0)throw Error("Draft conversationId is required.");if(t==null||typeof t!=="object"||typeof t.text!=="string"||!Number.isSafeInteger(t.revision)||t.revision<0||typeof t.source!=="string"||t.source.length===0)throw Error("Invalid shared composer draft.");let n=s(e);if(t.revision!==n.revision)return n;if(t.text===n.text)return n;let r={text:t.text,revision:n.revision+1,source:t.source};a={...a,[e]:r},o();let i=globalThis.codexLinuxFarfieldDraftControllers?.get(e);i!=null&&i.getPersistedText()!==r.text&&i.setText(r.text),$u.dispatchMessage("thread-composer-draft-changed",{conversationId:e,draft:r});return r};globalThis.codexLinuxFarfieldDraftControllers??=new Map,globalThis.codexLinuxFarfieldSideChatHandlers??=new Map,globalThis.codexLinuxFarfieldTakeoverSubmitHandlers??=new Map,globalThis.codexLinuxFarfieldRefreshHandlers??=new Map,globalThis.codexLinuxFarfieldReadDraft=s,globalThis.codexLinuxFarfieldSetDraft=c,globalThis.codexLinuxFarfieldRegisterComposer=(e,t,n)=>{let r=()=>location.reload();globalThis.codexLinuxFarfieldDraftControllers.set(e,t),globalThis.codexLinuxFarfieldSideChatHandlers.set(e,n),globalThis.codexLinuxFarfieldRefreshHandlers.set(e,r);let i=s(e),a=t.getPersistedText();return i.revision===0&&a.length>0?c(e,{text:a,revision:0,source:"desktop"}):a!==i.text&&t.setText(i.text),()=>{globalThis.codexLinuxFarfieldDraftControllers.get(e)===t&&globalThis.codexLinuxFarfieldDraftControllers.delete(e),globalThis.codexLinuxFarfieldSideChatHandlers.get(e)===n&&globalThis.codexLinuxFarfieldSideChatHandlers.delete(e),globalThis.codexLinuxFarfieldRefreshHandlers.get(e)===r&&globalThis.codexLinuxFarfieldRefreshHandlers.delete(e)}};globalThis.codexLinuxFarfieldRegisterTakeoverSubmit=(e,t)=>(globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.set(e,t),()=>{globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.get(e)===t&&globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.delete(e)}),globalThis.codexLinuxFarfieldPublishLocalDraft=(e,i)=>{let a=t.get(e);a!=null&&clearTimeout(a),t.set(e,setTimeout(()=>{t.delete(e);try{let t=s(e);c(e,{text:i,revision:t.revision,source:r})}catch(e){console.error("[Farfield draft bridge] Could not publish native draft",e)}},250))}})();`;
+const COMPOSER_BOOTSTRAP = String.raw`const codexLinuxFarfieldComposer=!0;(()=>{if(globalThis.codexLinuxFarfieldComposerBridgeInitialized)return;globalThis.codexLinuxFarfieldComposerBridgeInitialized=!0,globalThis.codexLinuxFarfieldSideChatHandlers??=new Map,globalThis.codexLinuxFarfieldTakeoverSubmitHandlers??=new Map,globalThis.codexLinuxFarfieldRegisterComposer=(e,t,n)=>(globalThis.codexLinuxFarfieldSideChatHandlers.set(e,n),()=>{globalThis.codexLinuxFarfieldSideChatHandlers.get(e)===n&&globalThis.codexLinuxFarfieldSideChatHandlers.delete(e)}),globalThis.codexLinuxFarfieldRegisterTakeoverSubmit=(e,t)=>(globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.set(e,t),()=>{globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.get(e)===t&&globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.delete(e)})})();`;
 
 function warn(message) {
   console.warn(`WARN: ${message} - skipping Farfield bridge patch`);
@@ -176,28 +174,36 @@ function applyFarfieldExtractedRouterPatch(extractedDir) {
   return { matched: true, changed: 1 };
 }
 
-function applyFarfieldBridgePatch(source) {
+function applyFarfieldDispatcherPatch(source) {
   if (source.includes(BRIDGE_MARKER)) return source;
-  if (!source.includes(DISPATCHER_NEEDLE) || !source.includes(QUEUE_NEEDLE)) {
-    warn("Could not find the current follower dispatcher and native queue hook");
+  if (!source.includes(DISPATCHER_NEEDLE)) {
+    warn("Could not find the current follower request dispatcher");
     return source;
   }
 
-  let patched = source.replace(DISPATCHER_NEEDLE, DISPATCHER_REPLACEMENT);
-  patched = patched.replace(QUEUE_NEEDLE, QUEUE_REPLACEMENT);
+  const patched = source.replace(DISPATCHER_NEEDLE, DISPATCHER_REPLACEMENT);
   return `const ${BRIDGE_MARKER}=!0;${patched}`;
+}
+
+function applyFarfieldQueuePatch(source) {
+  if (source.includes(QUEUE_MARKER)) return source;
+  if (!source.includes(QUEUE_NEEDLE)) {
+    warn("Could not find the current native queued follow-up hook");
+    return source;
+  }
+
+  return `const ${QUEUE_MARKER}=!0;${source.replace(QUEUE_NEEDLE, QUEUE_REPLACEMENT)}`;
 }
 
 function applyFarfieldComposerPatch(source) {
   if (source.includes(COMPOSER_MARKER)) return source;
   if (
     !source.includes(COMPOSER_REGISTRATION_NEEDLE) ||
-    !source.includes(COMPOSER_INPUT_NEEDLE) ||
     !source.includes(COMPOSER_SUBMIT_REGISTRATION_NEEDLE) ||
     !source.includes(COMPOSER_TURN_STARTED_NEEDLE) ||
     !source.includes(COMPOSER_QUEUED_FOLLOW_UP_NEEDLE)
   ) {
-    warn("Could not find the current native composer registration and input hooks");
+    warn("Could not find the current native composer registration and submit hooks");
     return source;
   }
 
@@ -205,7 +211,6 @@ function applyFarfieldComposerPatch(source) {
     COMPOSER_REGISTRATION_NEEDLE,
     COMPOSER_REGISTRATION_REPLACEMENT,
   );
-  patched = patched.replace(COMPOSER_INPUT_NEEDLE, COMPOSER_INPUT_REPLACEMENT);
   patched = patched.replace(COMPOSER_TURN_STARTED_NEEDLE, COMPOSER_TURN_STARTED_REPLACEMENT);
   patched = patched.replace(
     COMPOSER_QUEUED_FOLLOW_UP_NEEDLE,
@@ -219,11 +224,12 @@ function applyFarfieldComposerPatch(source) {
 }
 
 module.exports = {
-  applyFarfieldBridgePatch,
   applyFarfieldComposerPatch,
+  applyFarfieldDispatcherPatch,
   applyFarfieldExtractedRouterPatch,
   applyFarfieldMainProcessPatch,
   applyFarfieldProtocolPatch,
+  applyFarfieldQueuePatch,
   applyFarfieldRouterPatch,
   descriptors: [
     {
@@ -255,7 +261,7 @@ module.exports = {
       order: 20_759,
       ciPolicy: "optional",
       pattern:
-        /^app-initial~app-main~new-thread-panel-page~onboarding-page~appgen-library-page~hotkey-windo~d4kxte0o-[^.]+\.js$/,
+        /^app-initial~app-main~hotkey-window-new-thread-page~hotkey-window-home-page~composer-utility-bar-[^.]+\.js$/,
       missingDescription: "current Desktop follower protocol bundle",
       skipDescription: "Farfield follower method version needle drifted upstream",
       apply: applyFarfieldProtocolPatch,
@@ -268,12 +274,23 @@ module.exports = {
       pattern: /^app-initial~app-main~page-.*\.js$/,
       missingDescription: "current Desktop page bundle",
       skipDescription: "Farfield follower request or queue hook needles drifted upstream",
-      apply: applyFarfieldBridgePatch,
+      apply: applyFarfieldDispatcherPatch,
+    },
+    {
+      id: "desktop-farfield-native-queue",
+      phase: "webview-asset",
+      order: 20_761,
+      ciPolicy: "optional",
+      pattern:
+        /^app-initial~app-main~new-thread-panel-page~onboarding-page~appgen-library-page~hotkey-windo~nrw3o0ql-[^.]+\.js$/,
+      missingDescription: "current Desktop queued follow-up bundle",
+      skipDescription: "Farfield native queue hook drifted upstream",
+      apply: applyFarfieldQueuePatch,
     },
     {
       id: "desktop-farfield-composer-registration",
       phase: "webview-asset",
-      order: 20_761,
+      order: 20_762,
       ciPolicy: "optional",
       pattern:
         /^app-initial~app-main~new-thread-panel-page~appgen-library-page~hotkey-window-thread-page~ho~iufn7mg3-[^.]+\.js$/,
