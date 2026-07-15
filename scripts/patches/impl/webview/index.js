@@ -21,6 +21,24 @@ const LINUX_APP_SERVER_CONVERSATION_HYDRATION_UNKNOWN_TURN_MARKER = "codexLinuxR
 const LINUX_APP_SERVER_CONVERSATION_HYDRATION_QUEUE_MARKER = "codexLinuxRemoteMobileNotificationQueue";
 const LINUX_APP_SERVER_CONVERSATION_HYDRATION_IN_FLIGHT_MARKER = "codexLinuxRemoteMobileHydrationInFlight";
 const LINUX_APP_SERVER_CONVERSATION_HYDRATION_LATE_EVENT_MARKER = "codexLinuxRemoteMobileHydrateLateEvent";
+const LINUX_QUERY_STRUCTURAL_SHARING_GUARD_MARKER = "codexLinuxQueryStructuralSharingGuard";
+
+function applyLinuxQueryStructuralSharingGuardPatch(currentSource) {
+  if (currentSource.includes(LINUX_QUERY_STRUCTURAL_SHARING_GUARD_MARKER)) {
+    return currentSource;
+  }
+
+  const structuralSharingNeedle = "n?c<r:re.call(e,a)";
+  if (!currentSource.includes(structuralSharingNeedle)) {
+    return currentSource;
+  }
+
+  const patchedSource = currentSource.replace(
+    structuralSharingNeedle,
+    "n?c<r:Object.prototype.hasOwnProperty.call(e,a)",
+  );
+  return `const ${LINUX_QUERY_STRUCTURAL_SHARING_GUARD_MARKER}=!0;${patchedSource}`;
+}
 
 function applyLinuxSafeMonospaceFontStackPatch(currentSource) {
   const safeLinuxMonoFontPattern =
@@ -2003,6 +2021,7 @@ function patchCommentPreloadBundle(extractedDir) {
 }
 
 module.exports = {
+  applyLinuxQueryStructuralSharingGuardPatch,
   applyBrowserAnnotationScreenshotPatch,
   applyLinuxAppServerBackfillWaitPatch,
   applyLinuxAppServerConversationHydrationPatch,
