@@ -50,6 +50,11 @@ is active and its persistent router writes
   loopback base URL still routes the next request through the multi-auth proxy.
   This preserves Desktop's first-party tools and skills for legacy tasks while
   ensuring they do not bypass quota rotation.
+- New and resumed tasks rehydrate the native dynamic-tool registry before any
+  request is sent. If that registry is missing or empty, Desktop fails closed:
+  it stops the task and surfaces a red error explaining that ImageGen, browser,
+  dictation, and bundled skills are unavailable, avoiding a paid suboptimal
+  response.
 - A routed thread is assigned as soon as the router selects a usable account,
   and that redacted assignment survives router restarts for up to 90 days.
 - A thread with no assignment explains why: no current assignment record exists,

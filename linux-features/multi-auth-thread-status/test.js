@@ -5,6 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 const {
   applyMainProcessPatch,
@@ -17,6 +18,7 @@ const {
 const { applyStatusDialogPatch } = require("./webview.js");
 const { applyMultiAuthThreadRoutingPatch } = require("./routing.js");
 const {
+  enabledLinuxFeatureInstallPlan,
   loadLinuxFeaturePatchDescriptors,
 } = require("../../scripts/lib/linux-features.js");
 
@@ -266,6 +268,75 @@ test("keeps legacy thread resume and fork on the native provider", () => {
   const migrated = applyMultiAuthThreadRoutingPatch(previouslyPatched);
   assert.match(migrated, /modelProvider:`openai`,serviceTier:P\.serviceTier/);
   assert.match(migrated, /thread\/fork`,\{threadId:t,modelProvider:`openai`,path:/);
+});
+
+test("rehydrates native tools and fails closed when the registry is missing", () => {
+  const source = [
+    "P=await e.buildNewConversationParams(M,N,x[0]??`/`,k,k.approvalsReviewer,{mode:l?.mode,skipDynamicTools:!0,threadId:t}),F=e.sendRequest(`thread/resume`,{threadId:t,modelProvider:`openai`,config:P.config})",
+    "b=await this.buildNewConversationParams(t,n,r,o,s,y,g,{baseInstructions:l}),f!=null&&(b.serviceName=f),this.params.requestClient.sendRequest(`thread/start`,b)",
+  ].join(";");
+
+  const patched = applyTwice(applyMultiAuthThreadRoutingPatch, source);
+  assert.match(patched, /skipDynamicTools:!1/);
+  assert.match(patched, /Codex stopped: native Desktop tools and skills are unavailable/);
+  assert.match(patched, /dynamicTools/);
+  assert.match(patched, /thread\/resume/);
+  assert.match(patched, /thread\/start/);
+});
+
+test("stages a prelaunch capability guard", () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "codex-multi-auth-guard-plan-"));
+  const previous = process.env.CODEX_LINUX_FEATURES_CONFIG;
+  process.env.CODEX_LINUX_FEATURES_CONFIG = path.join(temp, "features.json");
+  try {
+    fs.writeFileSync(
+      process.env.CODEX_LINUX_FEATURES_CONFIG,
+      JSON.stringify({ enabled: ["multi-auth-thread-status"] }),
+    );
+    const plan = enabledLinuxFeatureInstallPlan({
+      featuresRoot: path.resolve(__dirname, ".."),
+    });
+    assert.deepEqual(
+      plan.runtimeHooks.map((hook) => [hook.key, hook.name, hook.mode]),
+      [["prelaunch", "multi-auth-thread-status-multi-auth-native-capability-guard.sh", 0o755]],
+    );
+  } finally {
+    if (previous == null) delete process.env.CODEX_LINUX_FEATURES_CONFIG;
+    else process.env.CODEX_LINUX_FEATURES_CONFIG = previous;
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+test("prelaunch guard blocks legacy or unguarded bundles", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-multi-auth-guard-"));
+  const assets = path.join(root, "content", "webview", "assets");
+  fs.mkdirSync(assets, { recursive: true });
+  const bundle = path.join(assets, "app-initial-test.js");
+  const hook = path.join(__dirname, "prelaunch-guard.sh");
+  const run = () => spawnSync("bash", [hook, root], {
+    encoding: "utf8",
+    env: { ...process.env, CODEX_MULTI_AUTH_GUARD_TEST: "1" },
+  });
+  try {
+    fs.writeFileSync(bundle, "modelProvider:`codex-multi-auth-runtime-proxy`");
+    let result = run();
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /CODEX NATIVE CAPABILITY ERROR/);
+
+    fs.writeFileSync(bundle, "modelProvider:`openai`");
+    result = run();
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /fail-closed guard is missing/);
+
+    fs.writeFileSync(
+      bundle,
+      "modelProvider:`openai`;skipDynamicTools:!1;native Desktop tools and skills are unavailable",
+    );
+    result = run();
+    assert.equal(result.status, 0, result.stderr);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("matches both legacy composer and current app-initial status assets", () => {

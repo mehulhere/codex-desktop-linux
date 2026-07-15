@@ -4,5 +4,12 @@
   "description": "Shows the routed codex-multi-auth account and its quota windows in each Desktop thread's status dialog.",
   "entrypoints": {
     "patchDescriptors": "./patch.js"
+  },
+  "runtimeHooks": {
+    "prelaunch": {
+      "source": "prelaunch-guard.sh",
+      "name": "multi-auth-native-capability-guard.sh",
+      "mode": "0755"
+    }
   }
 }
