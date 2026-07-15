@@ -242,7 +242,7 @@ test("adds the routed account and its quota rows to the current status dialog", 
   assert.match(patched, /i=codexLinuxMultiAuthRateLimitRows/);
 });
 
-test("routes legacy thread resume and fork through multi-auth", () => {
+test("keeps legacy thread resume and fork on the native provider", () => {
   const source = [
     "F=e.sendRequest(`thread/resume`,{threadId:t,history:null,modelProvider:P.modelProvider,serviceTier:P.serviceTier,cwd:P.cwd})",
     "v=await e.sendRequest(`thread/fork`,{threadId:t,path:n??null,cwd:r,threadSource:m,model:u??void 0,config:_})",
@@ -251,12 +251,21 @@ test("routes legacy thread resume and fork through multi-auth", () => {
   const patched = applyTwice(applyMultiAuthThreadRoutingPatch, source);
   assert.match(
     patched,
-    /modelProvider:P\.modelProvider\?\?`codex-multi-auth-runtime-proxy`/,
+    /modelProvider:`openai`,serviceTier:P\.serviceTier/,
   );
   assert.match(
     patched,
-    /thread\/fork`,\{threadId:t,modelProvider:`codex-multi-auth-runtime-proxy`,path:/,
+    /thread\/fork`,\{threadId:t,modelProvider:`openai`,path:/,
   );
+  assert.equal(patched.includes("codex-multi-auth-runtime-proxy"), false);
+
+  const previouslyPatched = [
+    "F=e.sendRequest(`thread/resume`,{threadId:t,history:null,modelProvider:P.modelProvider??`codex-multi-auth-runtime-proxy`,serviceTier:P.serviceTier,cwd:P.cwd})",
+    "v=await e.sendRequest(`thread/fork`,{threadId:t,modelProvider:`codex-multi-auth-runtime-proxy`,path:n??null,cwd:r})",
+  ].join(";");
+  const migrated = applyMultiAuthThreadRoutingPatch(previouslyPatched);
+  assert.match(migrated, /modelProvider:`openai`,serviceTier:P\.serviceTier/);
+  assert.match(migrated, /thread\/fork`,\{threadId:t,modelProvider:`openai`,path:/);
 });
 
 test("matches both legacy composer and current app-initial status assets", () => {

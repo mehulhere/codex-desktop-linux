@@ -46,9 +46,10 @@ is active and its persistent router writes
 - The 5-hour and 7-day rows use that assigned account's redacted quota
   windows, including percentage remaining and reset time. Native Desktop quota
   rows remain the fallback when multi-auth has no valid quota snapshot.
-- Resuming or forking a task created under the native `openai` provider routes
-  its next request through `codex-multi-auth-runtime-proxy`, so legacy tasks do
-  not bypass quota rotation.
+- Resuming or forking a task keeps the native `openai` provider, whose bound
+  loopback base URL still routes the next request through the multi-auth proxy.
+  This preserves Desktop's first-party tools and skills for legacy tasks while
+  ensuring they do not bypass quota rotation.
 - A routed thread is assigned as soon as the router selects a usable account,
   and that redacted assignment survives router restarts for up to 90 days.
 - A thread with no assignment explains why: no current assignment record exists,
