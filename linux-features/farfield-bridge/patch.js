@@ -18,7 +18,7 @@ const ROUTER_REPLACEMENT =
 const MAIN_METHOD_MAP_NEEDLE =
   '"thread-follower-set-queued-follow-ups-state":`thread-follower-set-queued-follow-ups-state-request`},G$=class{';
 const MAIN_METHOD_MAP_REPLACEMENT =
-  '"thread-follower-set-queued-follow-ups-state":`thread-follower-set-queued-follow-ups-state-request`,"thread-follower-open-side-chat":`thread-follower-open-side-chat-request`,"thread-follower-append-queued-follow-up":`thread-follower-append-queued-follow-up-request`,"thread-follower-type-and-submit-message":`thread-follower-type-and-submit-message-request`},G$=class{';
+  '"thread-follower-set-queued-follow-ups-state":`thread-follower-set-queued-follow-ups-state-request`,"thread-follower-open-side-chat":`thread-follower-open-side-chat-request`,"thread-follower-append-queued-follow-up":`thread-follower-append-queued-follow-up-request`,"thread-follower-type-and-submit-message":`thread-follower-type-and-submit-message-request`,"thread-follower-refresh-conversation":`thread-follower-refresh-conversation-request`},G$=class{';
 const MAIN_PENDING_MAP_NEEDLE =
   'pendingThreadFollowerSetQueuedFollowUpsStateRequests=new Map;pendingThreadRoleRequests=new Map;';
 const MAIN_PENDING_MAP_REPLACEMENT =
@@ -30,13 +30,15 @@ const MAIN_REQUEST_REPLACEMENT =
 const MAIN_RESPONSE_CASE_NEEDLE =
   'case`thread-follower-set-queued-follow-ups-state-response`:this.handleThreadFollowerSetQueuedFollowUpsStateResponse(e,t);break;case`thread-role-response`:';
 const MAIN_RESPONSE_CASE_REPLACEMENT =
-  'case`thread-follower-set-queued-follow-ups-state-response`:this.handleThreadFollowerSetQueuedFollowUpsStateResponse(e,t);break;case`thread-follower-open-side-chat-response`:case`thread-follower-append-queued-follow-up-response`:case`thread-follower-type-and-submit-message-response`:this.handleCodexLinuxFarfieldResponse(e,t);break;case`thread-role-response`:';
+  'case`thread-follower-set-queued-follow-ups-state-response`:this.handleThreadFollowerSetQueuedFollowUpsStateResponse(e,t);break;case`thread-follower-open-side-chat-response`:case`thread-follower-append-queued-follow-up-response`:case`thread-follower-type-and-submit-message-response`:case`thread-follower-refresh-conversation-response`:this.handleCodexLinuxFarfieldResponse(e,t);break;case`thread-role-response`:';
 const MAIN_RESPONSE_NEEDLE = 'handleThreadRoleResponse(e,t){';
 const MAIN_RESPONSE_REPLACEMENT =
   'handleCodexLinuxFarfieldResponse(e,t){let n=String(t.requestId),r=this.pendingCodexLinuxFarfieldRequests.get(n);if(!r||r.originId!==e.id)return;if(this.pendingCodexLinuxFarfieldRequests.delete(n),clearTimeout(r.timeout),t.error){r.reject(Error(t.error));return}if(!t.result){r.reject(Error(`Missing Codex Linux Farfield response`));return}r.resolve(t.result)}handleThreadRoleResponse(e,t){';
 const MAIN_REGISTRATION_NEEDLE =
   'r.add(t.addRequestHandler(`thread-follower-set-queued-follow-ups-state`,i,async t=>this.messageHandler.handleThreadFollowerSetQueuedFollowUpsStateRequest(e,t))),r.add(()=>t.dispose())';
 const MAIN_REGISTRATION_REPLACEMENT =
+  'r.add(t.addRequestHandler(`thread-follower-set-queued-follow-ups-state`,i,async t=>this.messageHandler.handleThreadFollowerSetQueuedFollowUpsStateRequest(e,t)));let a=async()=>this.options.windowManager.getPrimaryWindow()?.webContents.id===e.id;for(let n of[`thread-follower-open-side-chat`,`thread-follower-append-queued-follow-up`,`thread-follower-type-and-submit-message`,`thread-follower-refresh-conversation`])r.add(t.addRequestHandler(n,a,async t=>this.messageHandler.handleCodexLinuxFarfieldRequest(e,t)));r.add(()=>t.dispose())';
+const MAIN_REFRESH_REGISTRATION_NEEDLE =
   'r.add(t.addRequestHandler(`thread-follower-set-queued-follow-ups-state`,i,async t=>this.messageHandler.handleThreadFollowerSetQueuedFollowUpsStateRequest(e,t)));let a=async()=>this.options.windowManager.getPrimaryWindow()?.webContents.id===e.id;for(let n of[`thread-follower-open-side-chat`,`thread-follower-append-queued-follow-up`,`thread-follower-type-and-submit-message`])r.add(t.addRequestHandler(n,a,async t=>this.messageHandler.handleCodexLinuxFarfieldRequest(e,t)));r.add(t.addRequestHandler(`thread-follower-refresh-conversation`,async()=>!0,async t=>{let{conversationId:n}=t.params;if(typeof n!==`string`||n.length===0)throw Error(`Refresh conversationId is required.`);let r=c.BrowserWindow.getAllWindows().filter(n=>!n.isDestroyed()&&this.options.windowManager.isAppServiceWindow(n));if(r.length===0)throw Error(`No Desktop app window is available for refresh.`);setTimeout(()=>{for(let t of r)t.isDestroyed()||t.webContents.isDestroyed()||t.webContents.reload()},0);return{conversationId:n,refreshScheduled:!0}}));r.add(()=>t.dispose())';
 const MAIN_REFRESH_PREDICATE_NEEDLE =
   'addRequestHandler(`thread-follower-refresh-conversation`,a,async t=>';
@@ -56,6 +58,9 @@ const DISPATCHER_NEEDLE =
   'case`thread-follower-set-queued-follow-ups-state-request`:try{let{conversationId:t,state:n}=e.params;await b(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t}),await Ve(r,Lc.QUEUED_FOLLOW_UPS,n),il.dispatchMessage(`thread-queued-followups-changed`,{conversationId:t,messages:n[t]??[]}),il.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,result:{ok:!0}})}catch(t){let n=t;il.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-role-request`:';
 const DISPATCHER_REPLACEMENT =
   'case`thread-follower-set-queued-follow-ups-state-request`:try{let{conversationId:t,state:n}=e.params;await b(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t}),await Ve(r,Lc.QUEUED_FOLLOW_UPS,n),il.dispatchMessage(`thread-queued-followups-changed`,{conversationId:t,messages:n[t]??[]}),il.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,result:{ok:!0}})}catch(t){let n=t;il.dispatchMessage(`thread-follower-set-queued-follow-ups-state-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-follower-open-side-chat-request`:try{let{conversationId:t}=e.params;await b(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t});let n=globalThis.codexLinuxFarfieldSideChatHandlers?.get(t);if(n==null)throw Error(`Side task is unavailable for this conversation.`);let r=await n();if(r==null)throw Error(`Side task could not be opened.`);il.dispatchMessage(`thread-follower-open-side-chat-response`,{requestId:e.requestId,result:{conversationId:r}})}catch(t){let n=t;il.dispatchMessage(`thread-follower-open-side-chat-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-follower-append-queued-follow-up-request`:try{let{conversationId:t,message:n}=e.params;await b(`assert-thread-follower-owner-for-host`,{hostId:e.hostId,conversationId:t});let r=globalThis.codexLinuxFarfieldAppendQueuedFollowUp;if(r==null)throw Error(`Native queued follow-ups are unavailable.`);let i=await r(t,n);il.dispatchMessage(`thread-follower-append-queued-follow-up-response`,{requestId:e.requestId,result:i})}catch(t){let n=t;il.dispatchMessage(`thread-follower-append-queued-follow-up-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-follower-type-and-submit-message-request`:try{let{conversationId:t,text:n}=e.params;if(typeof t!==`string`||t.length===0)throw Error(`Takeover conversationId is required.`);if(typeof n!==`string`||n.trim().length===0)throw Error(`Takeover message text is required.`);il.dispatchHostMessage({type:`navigate-to-route`,path:`/local/${encodeURIComponent(t)}`,state:{focusComposerNonce:Date.now()}});let r=Date.now()+1e4,i=null;for(;Date.now()<r;){if(i=globalThis.codexLinuxFarfieldTakeoverSubmitHandlers?.get(t),i!=null)break;await new Promise(e=>setTimeout(e,50))}if(i==null)throw Error(`Native composer did not become ready for this conversation.`);await i(n),il.dispatchMessage(`thread-follower-type-and-submit-message-response`,{requestId:e.requestId,result:{conversationId:t,submitted:!0}})}catch(t){let n=t;il.dispatchMessage(`thread-follower-type-and-submit-message-response`,{requestId:e.requestId,error:String(n)})}break bb38;case`thread-role-request`:';
+
+const DISPATCHER_REFRESH_CASE =
+  'case`thread-follower-refresh-conversation-request`:try{let{conversationId:t}=e.params;if(typeof t!==`string`||t.length===0)throw Error(`Refresh conversationId is required.`);await b(`refresh-recent-conversations-for-host`,{hostId:e.hostId,mode:`routine`});il.dispatchMessage(`thread-follower-refresh-conversation-response`,{requestId:e.requestId,result:{conversationId:t,refreshScheduled:!0}})}catch(t){let n=t;il.dispatchMessage(`thread-follower-refresh-conversation-response`,{requestId:e.requestId,error:String(n)})}break bb38;';
 
 const QUEUE_NEEDLE =
   'function Sat(e){let t=$r(br),n=mh(e),{data:r,isLoading:i}=f(Zn.QUEUED_FOLLOW_UPS),a=Ct(),o=kn(`get-global-state`,{key:Zn.QUEUED_FOLLOW_UPS}),s=(0,I5.useRef)({}),c=(0,I5.useRef)(0),l=(0,I5.useRef)(0),u=(0,I5.useRef)([]),d=(0,I5.useRef)(!1);(0,I5.useEffect)';
@@ -97,6 +102,9 @@ function applyFarfieldProtocolPatch(source) {
 function applyFarfieldMainProcessPatch(source) {
   if (source.includes(MAIN_PROCESS_MARKER)) {
     let patched = source;
+    if (patched.includes(MAIN_REFRESH_REGISTRATION_NEEDLE)) {
+      patched = patched.replace(MAIN_REFRESH_REGISTRATION_NEEDLE, MAIN_REGISTRATION_REPLACEMENT);
+    }
     if (patched.includes(MAIN_REFRESH_HANDLER_NEEDLE)) {
       patched = patched.replace(MAIN_REFRESH_HANDLER_NEEDLE, MAIN_REFRESH_HANDLER_REPLACEMENT);
     }
@@ -181,7 +189,11 @@ function applyFarfieldDispatcherPatch(source) {
     return source;
   }
 
-  const patched = source.replace(DISPATCHER_NEEDLE, DISPATCHER_REPLACEMENT);
+  let patched = source.replace(DISPATCHER_NEEDLE, DISPATCHER_REPLACEMENT);
+  patched = patched.replace(
+    "case`thread-role-request`:",
+    DISPATCHER_REFRESH_CASE + "case" + String.fromCharCode(96) + "thread-role-request" + String.fromCharCode(96) + ":",
+  );
   return `const ${BRIDGE_MARKER}=!0;${patched}`;
 }
 

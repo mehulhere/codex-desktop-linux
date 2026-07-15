@@ -94,8 +94,9 @@ test("bridges acknowledged per-thread queue and takeover requests", () => {
   assert.match(patched, /codexLinuxFarfieldAppendQueuedFollowUp/);
   assert.match(patched, /thread-follower-append-queued-follow-up-response/);
   assert.match(patched, /thread-follower-type-and-submit-message-response/);
-  assert.doesNotMatch(patched, /case`thread-follower-refresh-conversation-request`/);
-  assert.doesNotMatch(patched, /thread-follower-refresh-conversation-response/);
+  assert.match(patched, /case`thread-follower-refresh-conversation-request`/);
+  assert.match(patched, /refresh-recent-conversations-for-host/);
+  assert.match(patched, /thread-follower-refresh-conversation-response/);
   assert.doesNotMatch(patched, /location\.reload\(\)/);
   assert.match(patched, /dispatchHostMessage\(\{type:`navigate-to-route`,path:`\/local\/\$\{encodeURIComponent\(t\)\}`/);
   assert.match(patched, /codexLinuxFarfieldTakeoverSubmitHandlers/);
@@ -166,7 +167,7 @@ test("acknowledges takeover only after the native composer starts or queues it",
   assert.match(patched, /return t/);
 });
 
-test("forwards composer requests to the primary renderer and refreshes all app windows", () => {
+test("forwards composer and soft-refresh requests to the primary renderer", () => {
   const fixture = [
     mainMethodMapNeedle,
     mainPendingMapNeedle,
@@ -182,7 +183,7 @@ test("forwards composer requests to the primary renderer and refreshes all app w
     patched,
     /"thread-follower-type-and-submit-message":`thread-follower-type-and-submit-message-request`/,
   );
-  assert.doesNotMatch(
+  assert.match(
     patched,
     /"thread-follower-refresh-conversation":`thread-follower-refresh-conversation-request`/,
   );
@@ -196,18 +197,11 @@ test("forwards composer requests to the primary renderer and refreshes all app w
   );
   assert.match(
     patched,
-    /`thread-follower-append-queued-follow-up`,`thread-follower-type-and-submit-message`\]\)r\.add\(t\.addRequestHandler\(n,a,/,
+    /`thread-follower-append-queued-follow-up`,`thread-follower-type-and-submit-message`,`thread-follower-refresh-conversation`\]\)r\.add\(t\.addRequestHandler\(n,a,/,
   );
-  assert.match(
-    patched,
-    /addRequestHandler\(`thread-follower-refresh-conversation`,async\(\)=>!0,async t=>/,
-  );
-  assert.match(patched, /let\{conversationId:n\}=t\.params/);
-  assert.match(patched, /c\.BrowserWindow\.getAllWindows\(\)/);
-  assert.match(patched, /windowManager\.isAppServiceWindow\(n\)/);
-  assert.match(patched, /\.webContents\.reload\(\)/);
-  assert.match(patched, /return\{conversationId:n,refreshScheduled:!0\}/);
-  assert.doesNotMatch(patched, /thread-follower-refresh-conversation-response/);
+  assert.doesNotMatch(patched, /c\.BrowserWindow\.getAllWindows\(\)/);
+  assert.doesNotMatch(patched, /\.webContents\.reload\(\)/);
+  assert.match(patched, /case`thread-follower-refresh-conversation-response`/);
   assert.match(
     patched,
     /`thread-follower-open-side-chat`/,
