@@ -7,9 +7,6 @@
     "patchDescriptors": "./patch.js"
   },
   "tweaks": {
-    "buildTag": {
-      "enabled": true
-    },
     "modelPicker": {
       "showModelsByDefault": {
         "enabled": true

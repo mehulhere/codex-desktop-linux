@@ -1,1 +1,1 @@
-- Manual check: open the restarted Desktop app and confirm the red `FEATURE BUILD · 27686a3` badge and the aggregate `quota` row are visible in the sidebar footer.
+- Manual check: open the restarted Desktop app and confirm it passes the startup logo and shows the aggregate `quota` row instead of the account name in the sidebar footer.
