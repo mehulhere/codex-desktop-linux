@@ -41,6 +41,11 @@ const {
   applyHideProfileNamePatch,
 } = require("./patches/hide-profile-name.js");
 const {
+  BUILD_TAG_ASSET_PATTERN,
+  BUILD_TAG_RUNTIME_MARKER,
+  applyFeatureBuildTagPatch,
+} = require("./patches/feature-build-tag.js");
+const {
   ENGLISH_REASONING_LABELS,
   ZH_CN_LOCALE_ASSET_PATTERN,
   applyEnglishReasoningLabels,
@@ -59,6 +64,15 @@ function profileFooterBundleFixture() {
     "let H=(0,yq.jsxs)(`button`,{\"aria-label\":R,onClick:z,children:[B,V]});",
     "return (0,yq.jsxs)(`div`,{children:[H,help]})}",
     "const profileMarker={id:`codex.profileFooter.openProfileMenu`};",
+  ].join("");
+}
+
+function currentProfileFooterBundleFixture() {
+  return [
+    "let H;(0,yq.jsxs)(`button`,{children:[B,V]});",
+    "const profileMarker={id:`codex.profileFooter.openProfileMenu`};",
+    "let te=(0,yq.jsx)(gse,{}),W=(0,yq.jsx)(Eh,{electron:!0});",
+    "return (0,yq.jsxs)(yq.Fragment,{children:[te,(0,yq.jsxs)(`div`,{className:`flex min-w-0 flex-1 items-center gap-0`,children:[te,W]})]})",
   ].join("");
 }
 
@@ -177,6 +191,7 @@ test("ui-tweaks is discoverable and disabled until listed in features.json", () 
       [
         ["feature:ui-tweaks:sidebar-project-name-style", "webview-asset", "optional"],
         ["feature:ui-tweaks:hide-profile-name", "webview-asset", "optional"],
+        ["feature:ui-tweaks:feature-build-tag", "webview-asset", "optional"],
         ["feature:ui-tweaks:model-picker-default-advanced-view", "webview-asset", "optional"],
         ["feature:ui-tweaks:model-picker-include-gpt-5-6", "webview-asset", "optional"],
         ["feature:ui-tweaks:model-picker-inline-model-list", "webview-asset", "optional"],
@@ -205,6 +220,17 @@ test("profile footer keeps Help, removes the account marker, and exposes a quota
   assert.equal(applyHideProfileNamePatch(patched), patched);
 });
 
+test("profile footer patch handles the current minified footer shape", () => {
+  const source = currentProfileFooterBundleFixture();
+  const patched = applyHideProfileNamePatch(source);
+
+  assert.notEqual(patched, source);
+  assert.match(patched, /data-codex-linux-sidebar-footer/);
+  assert.match(patched, /children:\[W\]/);
+  assert.doesNotMatch(patched, /children:\[te,W\]/);
+  assert.equal(applyHideProfileNamePatch(patched), patched);
+});
+
 test("profile footer name patch targets only the current sidebar page asset", () => {
   assert.match("app-initial~app-main~page-Cmd9LUYY.js", PROFILE_FOOTER_ASSET_PATTERN);
   assert.doesNotMatch("composer-Cmd9LUYY.js", PROFILE_FOOTER_ASSET_PATTERN);
@@ -213,6 +239,20 @@ test("profile footer name patch targets only the current sidebar page asset", ()
 test("profile footer name patch skips unrelated assets", () => {
   const source = "console.log('not the profile footer');";
   assert.equal(applyHideProfileNamePatch(source), source);
+});
+
+test("feature build tag adds a visible commit badge and is idempotent", () => {
+  const source = "console.log('index bundle');";
+  const patched = applyFeatureBuildTagPatch(source);
+
+  assert.notEqual(patched, source);
+  assert.match(patched, new RegExp(BUILD_TAG_RUNTIME_MARKER));
+  assert.match(patched, /codex-linux-get-build-info/);
+  assert.match(patched, /codex-linux-show-build-info/);
+  assert.match(patched, /FEATURE BUILD/);
+  assert.equal(applyFeatureBuildTagPatch(patched), patched);
+  assert.match("index-Cmd9LUYY.js", BUILD_TAG_ASSET_PATTERN);
+  assert.doesNotMatch("app-initial-Cmd9LUYY.js", BUILD_TAG_ASSET_PATTERN);
 });
 
 test("model picker descriptors target the current state and menu bundles", () => {
