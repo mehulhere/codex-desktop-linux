@@ -1,0 +1,1 @@
+- Manual check: open the restarted Desktop app and confirm the red `FEATURE BUILD · 27686a3` badge and the aggregate `quota` row are visible in the sidebar footer.
