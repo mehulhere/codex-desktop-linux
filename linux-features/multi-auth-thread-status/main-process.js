@@ -145,73 +145,140 @@ function poolQuotaUiBootstrap(ipcRenderer, channel) {
     if (document.getElementById("codex-linux-multi-auth-pool-quota")) return;
     const root = document.createElement("div");
     const button = document.createElement("button");
-    const inner = document.createElement("span");
+    const ring = document.createElement("span");
+    const ringInner = document.createElement("span");
+    const copy = document.createElement("span");
+    const label = document.createElement("strong");
+    const meta = document.createElement("small");
     const panel = document.createElement("div");
     root.id = "codex-linux-multi-auth-pool-quota";
     Object.assign(root.style, {
-      position: "fixed",
-      // The Linux window uses a frameless title bar, so keep the compact
-      // indicator in that upper chrome instead of covering the app toolbar.
-      top: "4px",
-      right: "88px",
-      zIndex: "2147483000",
+      position: "relative",
+      flex: "1 1 auto",
+      minWidth: "0",
+      maxWidth: "220px",
       fontFamily: "ui-sans-serif,system-ui,sans-serif",
       WebkitAppRegion: "no-drag",
     });
     button.type = "button";
     button.setAttribute("aria-label", "Combined quota unavailable");
+    button.setAttribute("aria-expanded", "false");
+    button.setAttribute("aria-controls", "codex-linux-multi-auth-pool-panel");
     Object.assign(button.style, {
-      width: "28px",
-      height: "28px",
+      display: "flex",
+      width: "100%",
+      minWidth: "0",
+      height: "40px",
+      alignItems: "center",
+      gap: "10px",
       border: "0",
-      borderRadius: "999px",
-      padding: "2px",
-      cursor: "default",
-      background: "#555",
-      color: "#f5f5f5",
+      borderRadius: "10px",
+      padding: "4px 8px",
+      cursor: "pointer",
+      background: "transparent",
+      color: "inherit",
+      textAlign: "left",
       WebkitAppRegion: "no-drag",
     });
-    Object.assign(inner.style, {
+    ring.setAttribute("aria-hidden", "true");
+    Object.assign(ring.style, {
       display: "flex",
-      width: "24px",
-      height: "24px",
+      width: "30px",
+      height: "30px",
+      flex: "0 0 auto",
       alignItems: "center",
       justifyContent: "center",
       borderRadius: "999px",
-      background: "#202020",
+      padding: "2px",
+      background: "#777",
+    });
+    Object.assign(ringInner.style, {
+      display: "flex",
+      width: "26px",
+      height: "26px",
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: "999px",
+      background: "Canvas",
+      color: "CanvasText",
       fontSize: "10px",
       fontWeight: "650",
       lineHeight: "1",
     });
-    inner.textContent = "—";
-    button.appendChild(inner);
+    ringInner.textContent = "—";
+    ring.appendChild(ringInner);
+    Object.assign(copy.style, {
+      display: "flex",
+      minWidth: "0",
+      flexDirection: "column",
+      gap: "1px",
+    });
+    Object.assign(label.style, {
+      overflow: "hidden",
+      color: "inherit",
+      fontSize: "13px",
+      fontWeight: "560",
+      lineHeight: "16px",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    });
+    Object.assign(meta.style, {
+      overflow: "hidden",
+      color: "color-mix(in srgb, currentColor 58%, transparent)",
+      fontSize: "11px",
+      fontWeight: "400",
+      lineHeight: "14px",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    });
+    label.textContent = "Quota unavailable";
+    meta.textContent = "Waiting for status";
+    copy.append(label, meta);
+    button.append(ring, copy);
+    panel.id = "codex-linux-multi-auth-pool-panel";
     panel.setAttribute("role", "tooltip");
     Object.assign(panel.style, {
       display: "none",
       position: "absolute",
-      top: "34px",
-      right: "0",
-      minWidth: "270px",
+      bottom: "44px",
+      left: "0",
+      zIndex: "2147483000",
+      minWidth: "286px",
       whiteSpace: "pre",
       padding: "12px 14px",
-      border: "1px solid rgba(255,255,255,.12)",
-      borderRadius: "10px",
-      background: "rgba(32,32,32,.98)",
+      border: "1px solid color-mix(in srgb, CanvasText 14%, transparent)",
+      borderRadius: "12px",
+      background: "color-mix(in srgb, Canvas 97%, transparent)",
       boxShadow: "0 10px 28px rgba(0,0,0,.35)",
-      color: "#f3f3f3",
+      color: "CanvasText",
       fontSize: "12px",
       lineHeight: "1.55",
       pointerEvents: "none",
     });
-    panel.textContent = "Combined quota\n\n7-day    Unavailable\n5-hour   Unavailable";
+    panel.textContent = "Combined quota\n\n7-day    Unavailable";
     root.append(button, panel);
-    const show = () => { panel.style.display = "block"; };
-    const hide = () => { panel.style.display = "none"; };
+    const show = () => {
+      panel.style.display = "block";
+      button.style.background = "rgba(127,127,127,.12)";
+      button.setAttribute("aria-expanded", "true");
+    };
+    const hide = () => {
+      panel.style.display = "none";
+      button.style.background = "transparent";
+      button.setAttribute("aria-expanded", "false");
+    };
     root.addEventListener("pointerenter", show);
     root.addEventListener("pointerleave", hide);
     root.addEventListener("focusin", show);
-    root.addEventListener("focusout", hide);
-    document.body.appendChild(root);
+    root.addEventListener("focusout", () => {
+      setTimeout(() => {
+        if (!root.contains(document.activeElement)) hide();
+      }, 0);
+    });
+    button.addEventListener("click", () => {
+      if (button.getAttribute("aria-expanded") === "true") hide();
+      else show();
+    });
 
     const formatWindow = (label, value) => value
       ? `${label.padEnd(10)}${Math.round(value.totalRemainingPercent)}% total    ${Math.round(value.averageRemainingPercent)}% average`
@@ -233,30 +300,49 @@ function poolQuotaUiBootstrap(ipcRenderer, channel) {
             ? "#f59e0b"
             : "#22c55e";
       const bounded = average == null ? 0 : Math.max(0, Math.min(100, average));
-      inner.textContent = average == null ? "—" : String(average);
-      button.style.background = average == null
+      ringInner.textContent = average == null ? "—" : String(average);
+      ring.style.background = average == null
         ? color
         : `conic-gradient(${color} ${bounded * 3.6}deg,rgba(255,255,255,.16) 0)`;
+      label.textContent = average == null ? "Quota unavailable" : `${average}% quota`;
+      meta.textContent = value?.accountCount
+        ? `${value.accountCount} ${value.accountCount === 1 ? "account" : "accounts"}`
+        : "Waiting for status";
       button.setAttribute(
         "aria-label",
         average == null
           ? "Combined quota unavailable"
-          : `Combined 7-day quota: ${average}% remaining across ${value.accountCount} accounts`,
+          : `${average}% quota across ${value.accountCount} accounts`,
       );
-      panel.textContent = [
+      const detailLines = [
         `Combined quota · ${value?.accountCount ?? 0} accounts`,
         "",
         formatWindow("7-day", value?.sevenDay),
-        formatWindow("5-hour", value?.fiveHour),
-        "",
-        value?.updatedAt ? formatAge(value.updatedAt) : "Status unavailable",
-      ].join("\n");
+      ];
+      if (value?.fiveHour) detailLines.push(formatWindow("5-hour", value.fiveHour));
+      detailLines.push("", value?.updatedAt ? formatAge(value.updatedAt) : "Status unavailable");
+      panel.textContent = detailLines.join("\n");
     };
     const refresh = () => ipcRenderer.invoke(channel).then(render).catch(() => render(null));
     refresh();
     const timer = setInterval(refresh, 60_000);
     window.addEventListener("focus", refresh);
     window.addEventListener("beforeunload", () => clearInterval(timer), { once: true });
+
+    const selector = "[data-codex-linux-sidebar-footer]";
+    const mount = () => {
+      const footer = document.querySelector(selector);
+      if (!footer) return false;
+      footer.prepend(root);
+      return true;
+    };
+    if (!mount()) {
+      const observer = new MutationObserver(() => {
+        if (mount()) observer.disconnect();
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      setTimeout(() => observer.disconnect(), 30_000);
+    }
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", install, { once: true });

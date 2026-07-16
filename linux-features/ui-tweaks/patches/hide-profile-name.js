@@ -2,8 +2,8 @@
 
 const PROFILE_FOOTER_ASSET_PATTERN = /^app-initial~app-main~page-[^.]+\.js$/;
 const PROFILE_FOOTER_MARKER = "codex.profileFooter.openProfileMenu";
-const PROFILE_BUTTON_CHILDREN_PATTERN =
-  /(onClick:[A-Za-z_$][\w$]*,children:\[)([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)(\]\})/;
+const PROFILE_FOOTER_CHILDREN_PATTERN =
+  /(\(`div`,\{)(children:\[)([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)(\]\}\))/;
 
 function hideProfileNameEnabled(context) {
   const defaults = context?.feature?.manifest?.tweaks?.sidebar?.hideProfileName;
@@ -26,8 +26,8 @@ function applyHideProfileNamePatch(source, context = {}) {
   const searchEnd = Math.min(source.length, markerIndex + 8_000);
   const componentSource = source.slice(componentStart, searchEnd);
   const patchedComponent = componentSource.replace(
-    PROFILE_BUTTON_CHILDREN_PATTERN,
-    "$1$2$4",
+    PROFILE_FOOTER_CHILDREN_PATTERN,
+    '$1"data-codex-linux-sidebar-footer":"",$2$4$5',
   );
   if (patchedComponent === componentSource) {
     return source;

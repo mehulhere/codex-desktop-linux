@@ -218,7 +218,13 @@ test("patches main process and preload with a narrow IPC bridge", () => {
   assert.match(patchedPreload, /codexLinuxMultiAuthPoolQuota/);
   assert.match(patchedPreload, /Combined quota/);
   assert.match(patchedPreload, /aria-label/);
-  assert.match(patchedPreload, /top:\s*["']4px["']/);
+  assert.match(patchedPreload, /data-codex-linux-sidebar-footer/);
+  assert.match(patchedPreload, /MutationObserver/);
+  assert.match(patchedPreload, /% quota/);
+  assert.match(patchedPreload, /accounts/);
+  assert.match(patchedPreload, /if \(value\?\.fiveHour\)/);
+  assert.doesNotMatch(patchedPreload, /top:\s*["']4px["']/);
+  assert.doesNotMatch(patchedPreload, /right:\s*["']88px["']/);
   assert.match(patchedPreload, /WebkitAppRegion:\s*["']no-drag["']/);
   assert.match(patchedPreload, /setInterval/);
   assert.match(patchedPreload, /focus/);

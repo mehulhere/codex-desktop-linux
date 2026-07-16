@@ -2,15 +2,15 @@
 
 Opt-in integration for `codex-multi-auth` quota-aware Desktop routing. It adds
 the locally routed account to the current thread's `/status` dialog and a
-pool-wide indicator in the upper title bar:
+pool-wide compact status row in the sidebar footer:
 
 ```text
 Account:  Account 4 (oc***@icloud.com)
 5h limit: 96% left (resets 09:42)
 7d limit: 99% left (resets 18 Jul)
 
-Title-bar circle: 25
-Hover card: 176% total | 25% average across 7 accounts
+Sidebar row: 25% quota · 7 accounts
+Detail card: 176% total | 25% average across 7 accounts
 ```
 
 The feature reads the owner-only app-router status file through a narrow
@@ -37,12 +37,11 @@ is active and its persistent router writes
 ## Behavior
 
 - `/status` shows `Account N (masked email)` for the open thread.
-- The title-bar circle shows the rounded combined 7-day average without
-  covering the app's layout controls. Hovering or keyboard-focusing it shows
-  pool totals and averages for both windows.
-- Missing 5-hour data reads `Unavailable`; it is never treated as zero. The
-  local status snapshot refreshes on focus and every 60 seconds without
-  launching live quota probes from Desktop.
+- The sidebar footer row shows the rounded combined 7-day average and account
+  count. Hovering or keyboard-focusing it shows pool totals and averages.
+- Missing 5-hour data is omitted from the detail card; it is never treated as
+  zero. The local status snapshot refreshes on focus and every 60 seconds
+  without launching live quota probes from Desktop.
 - The 5-hour and 7-day rows use that assigned account's redacted quota
   windows, including percentage remaining and reset time. Native Desktop quota
   rows remain the fallback when multi-auth has no valid quota snapshot.

@@ -20,7 +20,7 @@ Enable it in the local, gitignored feature config:
 | `modelPicker.showModelsByDefault` | `patches/model-picker-model-list.js` | Opens the advanced picker by default and shows model choices inline instead of hiding them behind the compact Power slider and a nested Model submenu. | `tweaks.modelPicker.showModelsByDefault.enabled` |
 | `reasoning.keepEffortLabelsEnglish` | `patches/reasoning-effort-labels.js` | Keeps reasoning effort values in English in the Simplified Chinese UI while leaving the surrounding interface translated. | `tweaks.reasoning.keepEffortLabelsEnglish.enabled` |
 | `sidebar.projectName` | `patches/sidebar-project-name.js` | Styles project names in the left sidebar project list. It does not style `Projects` / `Chats` section headings and does not style chat rows. | `tweaks.sidebar.projectName.enabled`, `tweaks.sidebar.projectName.style` |
-| `sidebar.hideProfileName` | `patches/hide-profile-name.js` | Removes the signed-in account name from the sidebar footer while retaining the profile avatar/menu and Help control. | `tweaks.sidebar.hideProfileName.enabled` |
+| `sidebar.hideProfileName` | `patches/hide-profile-name.js` | Removes the signed-in account marker from the sidebar footer, retains Help, and exposes the anchor used by the combined-quota control. | `tweaks.sidebar.hideProfileName.enabled` |
 
 ## Settings
 
@@ -109,10 +109,12 @@ Config keys:
 
 ### `sidebar.hideProfileName`
 
-Removes only the visible signed-in account name from the sidebar footer. The
-avatar remains available as the profile-menu trigger, and authentication,
+Removes the visible signed-in account name and avatar/profile-menu trigger from
+the sidebar footer while retaining Help. The patched footer exposes a stable
+anchor used by the `multi-auth-thread-status` compact quota row. Authentication,
 settings, Help, and multi-auth routing behavior are unchanged. Set
-`tweaks.sidebar.hideProfileName.enabled` to `false` to show the name again.
+`tweaks.sidebar.hideProfileName.enabled` to `false` to keep the upstream profile
+control instead.
 
 ## Drift Behavior
 

@@ -193,14 +193,15 @@ test("ui-tweaks is discoverable and disabled until listed in features.json", () 
   }
 });
 
-test("profile footer keeps the menu avatar and help control but removes the account name", () => {
+test("profile footer keeps Help, removes the account marker, and exposes a quota anchor", () => {
   const source = profileFooterBundleFixture();
   const patched = applyHideProfileNamePatch(source);
 
   assert.notEqual(patched, source);
-  assert.match(patched, /children:\[B\]/);
-  assert.doesNotMatch(patched, /children:\[B,V\]/);
-  assert.match(patched, /children:\[H,help\]/);
+  assert.match(patched, /data-codex-linux-sidebar-footer/);
+  assert.doesNotMatch(patched, /children:\[B\]/);
+  assert.doesNotMatch(patched, /children:\[H,help\]/);
+  assert.match(patched, /children:\[help\]/);
   assert.equal(applyHideProfileNamePatch(patched), patched);
 });
 
