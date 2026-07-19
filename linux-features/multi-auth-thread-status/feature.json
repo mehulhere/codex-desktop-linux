@@ -2,6 +2,9 @@
   "id": "multi-auth-thread-status",
   "name": "Multi-auth per-thread status",
   "description": "Shows the routed codex-multi-auth account and its quota windows in each Desktop thread's status dialog.",
+  "runtimeHooks": {
+    "prelaunch": "ensure-router-ready.sh"
+  },
   "entrypoints": {
     "patchDescriptors": "./patch.js"
   }

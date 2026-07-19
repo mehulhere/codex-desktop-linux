@@ -38,10 +38,16 @@ is active and its persistent router writes
 
 - `/status` shows `Account N (masked email)` for the open thread.
 - The sidebar footer row shows the rounded combined 7-day average and account
-  count. Hovering or keyboard-focusing it shows pool totals and averages.
+  count. Hovering or keyboard-focusing it shows pool totals, averages, and a
+  live age label that advances every second before switching to minutes. The
+  detail card's `Refresh` button runs `codex-multi-auth check`, deduplicates
+  concurrent clicks, and renders the refreshed aggregate without exposing CLI
+  output or account credentials to the renderer.
 - Missing 5-hour data is omitted from the detail card; it is never treated as
-  zero. The local status snapshot refreshes on focus and every 60 seconds
-  without launching live quota probes from Desktop.
+  zero. Each completed message refreshes the local status snapshot after the
+  router's one-second sidecar write, so the response's quota headers appear in
+  the combined indicator immediately. Focus and 60-second refreshes remain as
+  fallbacks, without launching live quota probes from Desktop.
 - The 5-hour and 7-day rows use that assigned account's redacted quota
   windows, including percentage remaining and reset time. Native Desktop quota
   rows remain the fallback when multi-auth has no valid quota snapshot.

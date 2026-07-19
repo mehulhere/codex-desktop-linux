@@ -8,6 +8,7 @@ const {
 } = require("./main-process.js");
 const { applyStatusDialogPatch } = require("./webview.js");
 const { applyMultiAuthThreadRoutingPatch } = require("./routing.js");
+const { applyTurnCompletedRefreshPatch } = require("./turn-completed.js");
 
 function applyPreloadExtractedAppPatch(extractedDir) {
   const buildDir = path.join(extractedDir, ".vite", "build");
@@ -53,6 +54,16 @@ module.exports = {
             : "skipped-optional",
         reason: result?.reason ?? warnings[0] ?? null,
       }),
+    },
+    {
+      id: "turn-completed-refresh",
+      phase: "webview-asset",
+      order: 20_712,
+      ciPolicy: "optional",
+      pattern: /^app-initial.*\.js$/,
+      missingDescription: "turn completion notification bundle",
+      skipDescription: "multi-auth turn-completed quota refresh patch",
+      apply: applyTurnCompletedRefreshPatch,
     },
     {
       id: "legacy-thread-routing",

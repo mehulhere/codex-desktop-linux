@@ -129,6 +129,10 @@ test("registers native side-task and takeover handlers without draft synchroniza
   assert.doesNotMatch(patched, /localStorage/);
   assert.doesNotMatch(patched, /thread-composer-draft-changed/);
   assert.match(patched, /codexLinuxFarfieldRegisterTakeoverSubmit/);
+  assert.match(patched, /codexLinuxContinueButton/);
+  assert.match(patched, /data-codex-linux-continue-button/);
+  assert.match(patched, /t\.textContent="Continue"/);
+  assert.match(patched, /await n\("Continue"\)/);
   assert.match(patched, /Fn\.setText\(e\)/);
   assert.match(
     patched,
@@ -164,6 +168,26 @@ test("acknowledges takeover only after the native composer starts or queues it",
     /if\(t==null\)throw Error\(`Native composer did not accept the takeover message\.`\)/,
   );
   assert.match(patched, /return t/);
+});
+
+test("upgrades an already-patched composer bundle with the Continue button", () => {
+  const legacyBootstrap = String.raw`const codexLinuxFarfieldComposer=!0;(()=>{if(globalThis.codexLinuxFarfieldComposerBridgeInitialized)return;globalThis.codexLinuxFarfieldComposerBridgeInitialized=!0,globalThis.codexLinuxFarfieldSideChatHandlers??=new Map,globalThis.codexLinuxFarfieldTakeoverSubmitHandlers??=new Map,globalThis.codexLinuxFarfieldRegisterComposer=(e,t,n)=>(globalThis.codexLinuxFarfieldSideChatHandlers.set(e,n),()=>{globalThis.codexLinuxFarfieldSideChatHandlers.get(e)===n&&globalThis.codexLinuxFarfieldSideChatHandlers.delete(e)}),globalThis.codexLinuxFarfieldRegisterTakeoverSubmit=(e,t)=>(globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.set(e,t),()=>{globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.get(e)===t&&globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.delete(e)})})();`;
+  const patched = applyFarfieldComposerPatch(`${legacyBootstrap}const existingPatch=true;`);
+
+  assert.match(patched, /codexLinuxContinueButton/);
+  assert.doesNotMatch(patched, /globalThis\.codexLinuxFarfieldRegisterComposer=\(e,t,n\)/);
+  assert.equal(applyFarfieldComposerPatch(patched), patched);
+});
+
+test("adds the Continue button to the current composer bundle", () => {
+  const patched = applyFarfieldComposerPatch('(0,$q.useEffect)(()=>{},[null,Cn])');
+
+  assert.match(patched, /codexLinuxContinueButtonRegistration/);
+  assert.match(patched, /persistedPromptRawOverride:"Continue"/);
+  assert.match(patched, /promptRawOverride:"Continue"/);
+  assert.match(patched, /skipGoalSubmit:!0/);
+  assert.match(patched, /data-codex-linux-continue-button/);
+  assert.equal(applyFarfieldComposerPatch(patched), patched);
 });
 
 test("forwards composer requests to the primary renderer and refreshes all app windows", () => {

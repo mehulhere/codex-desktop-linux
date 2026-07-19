@@ -70,6 +70,10 @@ const COMPOSER_SUBMIT_REGISTRATION_NEEDLE =
   '(0,XY.useEffect)(()=>{},[null,Fn])';
 const COMPOSER_SUBMIT_REGISTRATION_REPLACEMENT =
   'let codexLinuxFarfieldTakeoverSubmitRegistration=(0,XY.useEffect)(()=>{if(V==null||Ts.type!==`local`||Zo!=null&&Zo!==`empty-message`)return;let e=async e=>{Fn.setText(e);let t=null;await js({promptRawOverride:e,persistedPromptRawOverride:e,focusComposerAfterSubmit:!0,onLocalTurnStarted:e=>{t=e},onQueuedFollowUp:e=>{t={threadId:V,queuedFollowUpId:e}}});if(t==null)throw Error(`Native composer did not accept the takeover message.`);return t};return globalThis.codexLinuxFarfieldRegisterTakeoverSubmit(V,e)},[V,Fn,js,Ts.type,Zo])';
+const CURRENT_COMPOSER_SUBMIT_REGISTRATION_NEEDLE =
+  '(0,$q.useEffect)(()=>{},[null,Cn])';
+const CURRENT_COMPOSER_SUBMIT_REGISTRATION_REPLACEMENT =
+  'let codexLinuxContinueButtonRegistration=(0,$q.useEffect)(()=>{if(H==null||L?.type!==`local`)return;let e=()=>{let e=document.querySelector("textarea")?.closest("form")??document.querySelector("[contenteditable=\\"true\\"]")?.closest("form");if(e==null||e.querySelector("[data-codex-linux-continue-button]")!=null)return;let t=document.createElement("button");t.type="button",t.dataset.codexLinuxContinueButton="true",t.textContent="Continue",t.title="Send Continue",t.className="codex-linux-continue-button",Object.assign(t.style,{marginRight:"8px",border:"0",borderRadius:"9999px",padding:"7px 12px",background:"transparent",color:"inherit",font:"inherit",cursor:"pointer"}),t.addEventListener("click",async()=>{t.disabled=!0;try{await Rs({focusComposerAfterSubmit:!0,persistedPromptRawOverride:"Continue",promptRawOverride:"Continue",skipGoalSubmit:!0})}finally{t.disabled=!1}});let n=e.querySelector("button[type=submit]");n?.parentElement?.insertBefore(t,n)},t=new MutationObserver(e);return e(),t.observe(document.documentElement,{childList:!0,subtree:!0}),()=>t.disconnect()},[H,L?.type,Rs]);const codexLinuxContinueButton=!0';
 const COMPOSER_TURN_STARTED_NEEDLE =
   'onLocalTurnStarted:e=>{xn!=null&&e.threadId!=null&&e.turnId!=null&&Vb(N,xn.itemId,e.threadId,e.turnId)},openSideChatFromComposer:_s';
 const COMPOSER_TURN_STARTED_REPLACEMENT =
@@ -79,7 +83,8 @@ const COMPOSER_QUEUED_FOLLOW_UP_NEEDLE =
 const COMPOSER_QUEUED_FOLLOW_UP_REPLACEMENT =
   'if(ie){yT(A,{result:wo.CODEX_REMOTE_SSH_MESSAGE_RESULT_QUEUED,submitAction:q});let e=k.enqueue({text:re,context:ue,cwd:M})?.id??null;u(e),e!=null&&T.onQueuedFollowUp?.(e),n(),N(!1),U&&c();return}';
 
-const COMPOSER_BOOTSTRAP = String.raw`const codexLinuxFarfieldComposer=!0;(()=>{if(globalThis.codexLinuxFarfieldComposerBridgeInitialized)return;globalThis.codexLinuxFarfieldComposerBridgeInitialized=!0,globalThis.codexLinuxFarfieldSideChatHandlers??=new Map,globalThis.codexLinuxFarfieldTakeoverSubmitHandlers??=new Map,globalThis.codexLinuxFarfieldRegisterComposer=(e,t,n)=>(globalThis.codexLinuxFarfieldSideChatHandlers.set(e,n),()=>{globalThis.codexLinuxFarfieldSideChatHandlers.get(e)===n&&globalThis.codexLinuxFarfieldSideChatHandlers.delete(e)}),globalThis.codexLinuxFarfieldRegisterTakeoverSubmit=(e,t)=>(globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.set(e,t),()=>{globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.get(e)===t&&globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.delete(e)})})();`;
+const LEGACY_COMPOSER_BOOTSTRAP = String.raw`const codexLinuxFarfieldComposer=!0;(()=>{if(globalThis.codexLinuxFarfieldComposerBridgeInitialized)return;globalThis.codexLinuxFarfieldComposerBridgeInitialized=!0,globalThis.codexLinuxFarfieldSideChatHandlers??=new Map,globalThis.codexLinuxFarfieldTakeoverSubmitHandlers??=new Map,globalThis.codexLinuxFarfieldRegisterComposer=(e,t,n)=>(globalThis.codexLinuxFarfieldSideChatHandlers.set(e,n),()=>{globalThis.codexLinuxFarfieldSideChatHandlers.get(e)===n&&globalThis.codexLinuxFarfieldSideChatHandlers.delete(e)}),globalThis.codexLinuxFarfieldRegisterTakeoverSubmit=(e,t)=>(globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.set(e,t),()=>{globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.get(e)===t&&globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.delete(e)})})();`;
+const COMPOSER_BOOTSTRAP = String.raw`const codexLinuxFarfieldComposer=!0;(()=>{if(globalThis.codexLinuxFarfieldComposerBridgeInitialized)return;globalThis.codexLinuxFarfieldComposerBridgeInitialized=!0,globalThis.codexLinuxFarfieldSideChatHandlers??=new Map,globalThis.codexLinuxFarfieldTakeoverSubmitHandlers??=new Map;let e=()=>{let e=globalThis.codexLinuxFarfieldActiveConversationId,n=e&&globalThis.codexLinuxFarfieldTakeoverSubmitHandlers?.get(e);if(n==null)return;let r=document.querySelector("textarea")?.closest("form")??document.querySelector("[contenteditable=\"true\"]")?.closest("form");if(r==null||r.querySelector("[data-codex-linux-continue-button]")!=null)return;let t=document.createElement("button");t.type="button",t.dataset.codexLinuxContinueButton="true",t.textContent="Continue",t.title="Send Continue",t.className="codex-linux-continue-button";let o=document.createElement("style");o.dataset.codexLinuxContinueButtonStyle="true",o.textContent=".codex-linux-continue-button{margin-right:8px;border:0;border-radius:9999px;padding:7px 12px;background:transparent;color:var(--text-token-foreground,#e5e7eb);font:inherit;cursor:pointer}.codex-linux-continue-button:hover{background:var(--background-token-strong,#2b2b2b)}.codex-linux-continue-button:disabled{opacity:.5;cursor:default}",document.head?.append(o),t.addEventListener("click",async()=>{let e=globalThis.codexLinuxFarfieldActiveConversationId,n=e&&globalThis.codexLinuxFarfieldTakeoverSubmitHandlers?.get(e);if(n==null)return;t.disabled=!0;try{await n("Continue")}finally{t.disabled=!1}});let i=r.querySelector("button[type=submit]");i?.parentElement?.insertBefore(t,i)};globalThis.codexLinuxFarfieldRegisterComposer=(n,r,t)=>(globalThis.codexLinuxFarfieldActiveConversationId=n,globalThis.codexLinuxFarfieldSideChatHandlers.set(n,t),e(),()=>{globalThis.codexLinuxFarfieldSideChatHandlers.get(n)===t&&globalThis.codexLinuxFarfieldSideChatHandlers.delete(n),globalThis.codexLinuxFarfieldActiveConversationId===n&&(globalThis.codexLinuxFarfieldActiveConversationId=null)}),globalThis.codexLinuxFarfieldRegisterTakeoverSubmit=(n,r)=>(globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.set(n,r),e(),()=>{globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.get(n)===r&&globalThis.codexLinuxFarfieldTakeoverSubmitHandlers.delete(n)});new MutationObserver(e).observe(document.documentElement,{childList:!0,subtree:!0})})();`;
 
 function warn(message) {
   console.warn(`WARN: ${message} - skipping Farfield bridge patch`);
@@ -196,7 +201,20 @@ function applyFarfieldQueuePatch(source) {
 }
 
 function applyFarfieldComposerPatch(source) {
-  if (source.includes(COMPOSER_MARKER)) return source;
+  if (source.includes("codexLinuxContinueButton")) return source;
+  if (source.includes(CURRENT_COMPOSER_SUBMIT_REGISTRATION_NEEDLE)) {
+    return `const ${COMPOSER_MARKER}=!0;${source.replace(
+      CURRENT_COMPOSER_SUBMIT_REGISTRATION_NEEDLE,
+      CURRENT_COMPOSER_SUBMIT_REGISTRATION_REPLACEMENT,
+    )}`;
+  }
+  if (source.includes(COMPOSER_MARKER)) {
+    if (source.includes(LEGACY_COMPOSER_BOOTSTRAP)) {
+      return source.replace(LEGACY_COMPOSER_BOOTSTRAP, COMPOSER_BOOTSTRAP);
+    }
+    warn("Could not upgrade the existing native composer bridge");
+    return source;
+  }
   if (
     !source.includes(COMPOSER_REGISTRATION_NEEDLE) ||
     !source.includes(COMPOSER_SUBMIT_REGISTRATION_NEEDLE) ||

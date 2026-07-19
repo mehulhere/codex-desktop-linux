@@ -3,28 +3,57 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const net = require("node:net");
 const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
 const test = require("node:test");
 const {
   applyMainProcessPatch,
   applyPreloadPatch,
+  formatPoolQuotaAge,
   readPoolStatusFromFile,
   readThreadStatusFromFile,
   readThreadStatusResultFromFile,
   sanitizePoolStatus,
 } = require("./main-process.js");
 const { applyStatusDialogPatch } = require("./webview.js");
+const { applyTurnCompletedRefreshPatch } = require("./turn-completed.js");
 const { applyMultiAuthThreadRoutingPatch } = require("./routing.js");
 const {
+  enabledLinuxFeatureInstallPlan,
   loadLinuxFeaturePatchDescriptors,
 } = require("../../scripts/lib/linux-features.js");
+
+async function reserveLoopbackPort() {
+  const server = net.createServer();
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  assert.notEqual(address, null);
+  assert.equal(typeof address, "object");
+  const port = address.port;
+  await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  return port;
+}
 
 function applyTwice(fn, source) {
   const patched = fn(source);
   assert.equal(fn(patched), patched);
   return patched;
 }
+
+test("formats the combined quota age with a live seconds counter", () => {
+  const now = 100_000;
+  assert.equal(formatPoolQuotaAge(now, now), "Updated just now");
+  assert.equal(formatPoolQuotaAge(now - 1_000, now), "Updated 1 second ago");
+  assert.equal(formatPoolQuotaAge(now - 12_000, now), "Updated 12 seconds ago");
+  assert.equal(formatPoolQuotaAge(now - 59_999, now), "Updated 59 seconds ago");
+  assert.equal(formatPoolQuotaAge(now - 60_000, now), "Updated 1 minute ago");
+  assert.equal(formatPoolQuotaAge(now - 120_000, now), "Updated 2 minutes ago");
+});
 
 test("reads only one validated redacted thread record", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "codex-multi-auth-status-"));
@@ -209,7 +238,10 @@ test("patches main process and preload with a narrow IPC bridge", () => {
   const patchedPreload = applyTwice(applyPreloadPatch, preload);
   assert.match(patchedMain, /codex_linux:multi-auth-thread-status/);
   assert.match(patchedMain, /codex_linux:multi-auth-pool-status/);
+  assert.match(patchedMain, /codex_linux:multi-auth-pool-refresh/);
   assert.match(patchedMain, /require\(`electron`\)/);
+  assert.match(patchedMain, /execFile/);
+  assert.match(patchedMain, /codex-multi-auth\.js/);
   assert.match(patchedMain, /runtime-rotation-app-bind-status\.json/);
   assert.match(patchedMain, /senderFrame/);
   assert.match(patchedPreload, /getMultiAuthThreadStatus/);
@@ -228,7 +260,96 @@ test("patches main process and preload with a narrow IPC bridge", () => {
   assert.match(patchedPreload, /WebkitAppRegion:\s*["']no-drag["']/);
   assert.match(patchedPreload, /setInterval/);
   assert.match(patchedPreload, /focus/);
+  assert.match(patchedPreload, /codex-linux-turn-completed/);
+  assert.match(patchedPreload, /setTimeout/);
+  assert.match(patchedPreload, /Updated \$\{seconds\} seconds ago/);
+  assert.match(patchedPreload, /ageTimer/);
+  assert.match(patchedPreload, /1_000/);
+  assert.match(patchedPreload, /codex_linux:multi-auth-pool-refresh/);
+  assert.match(patchedPreload, /Refreshing…/);
+  assert.match(patchedPreload, /refreshButton/);
   assert.doesNotThrow(() => new Function(patchedPreload));
+});
+
+test("upgrades an installed main-process quota bridge with live refresh", () => {
+  const legacyMain = [
+    "const codexLinuxMultiAuthElectron=require(`electron`),codexLinuxMultiAuthFs=require(`node:fs`),codexLinuxMultiAuthPath=require(`node:path`);",
+    "const codexLinuxMultiAuthPoolStatusChannel=`codex_linux:multi-auth-pool-status`;",
+    "function codexLinuxMultiAuthStatusPath(){return `/tmp/status.json`}",
+    "function codexLinuxReadMultiAuthPoolStatus(){return null}",
+    "function codexLinuxMultiAuthTrustedStatusSender(){return true}",
+    "codexLinuxMultiAuthElectron.ipcMain.removeHandler?.(codexLinuxMultiAuthPoolStatusChannel);codexLinuxMultiAuthElectron.ipcMain.handle(codexLinuxMultiAuthPoolStatusChannel,async e=>codexLinuxMultiAuthTrustedStatusSender(e)?codexLinuxReadMultiAuthPoolStatus():null);",
+    "function codexLinuxReadMultiAuthThreadStatus(){return null}",
+    "exports.runMainAppStartup=()=>{};",
+  ].join("");
+
+  const upgraded = applyTwice(applyMainProcessPatch, legacyMain);
+  assert.match(upgraded, /codex_linux:multi-auth-pool-refresh/);
+  assert.match(upgraded, /node:child_process/);
+  assert.match(upgraded, /codexLinuxMultiAuthCheckCommand/);
+  assert.match(upgraded, /execFile/);
+  assert.doesNotThrow(() => new Function(upgraded));
+});
+
+test("refreshes the pool quota bridge when a turn completes", () => {
+  assert.equal(typeof applyTurnCompletedRefreshPatch, "function");
+  const source =
+    "class T{onNotification(e,t){let n={method:e,params:t};switch(n.method){case`turn/completed`:{if(this.frameTextDeltaQueue.drainBefore(()=>{this.onNotification(`turn/completed`,n.params)}))break;let{threadId:e,turn:t}=n.params;break}}}}";
+
+  const patched = applyTwice(applyTurnCompletedRefreshPatch, source);
+  assert.notEqual(patched, source);
+  assert.match(patched, /codex-linux-turn-completed/);
+  assert.match(patched, /dispatchEvent/);
+});
+
+test("upgrades an already-patched preload with turn-completed refresh", () => {
+  const legacyPreload = `let e=require(\`electron\`);var D={getMultiAuthThreadStatus:async t=>e.ipcRenderer.invoke(\`codex_linux:multi-auth-thread-status\`,t),getMultiAuthPoolStatus:async()=>e.ipcRenderer.invoke(\`codex_linux:multi-auth-pool-status\`),codexLinuxMultiAuthPoolQuota:(function poolQuotaUiBootstrap(ipcRenderer, channel) {
+    const refresh = () => ipcRenderer.invoke(channel).then(render).catch(() => render(null));
+    refresh();
+    const timer = setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("beforeunload", () => clearInterval(timer), { once: true });
+  })(e.ipcRenderer,"codex_linux:multi-auth-pool-status"),getBuildFlavor:()=>\`prod\`};`;
+
+  const upgraded = applyTwice(applyPreloadPatch, legacyPreload);
+  assert.notEqual(upgraded, legacyPreload);
+  assert.match(upgraded, /codex-linux-turn-completed/);
+  assert.match(upgraded, /refreshAfterTurn/);
+  assert.doesNotThrow(() => new Function(upgraded));
+});
+
+test("upgrades the installed moments-ago quota panel to a live age counter", () => {
+  const installedPreload = `let e=require(\`electron\`);var D={getMultiAuthThreadStatus:async t=>e.ipcRenderer.invoke(\`codex_linux:multi-auth-thread-status\`,t),getMultiAuthPoolStatus:async()=>e.ipcRenderer.invoke(\`codex_linux:multi-auth-pool-status\`),codexLinuxMultiAuthPoolQuota:(function poolQuotaUiBootstrap(ipcRenderer, channel, turnCompletedEvent) {
+    const formatAge = (updatedAt) => {
+      const minutes = Math.floor(Math.max(0, Date.now() - updatedAt) / 60_000);
+      return minutes < 1 ? "Updated moments ago" : \`Updated \${minutes}m ago\`;
+    };
+    const render = (value) => {
+      panel.textContent = value?.updatedAt ? formatAge(value.updatedAt) : "Status unavailable";
+    };
+    const refresh = () => ipcRenderer.invoke(channel).then(render).catch(() => render(null));
+    refresh();
+    const timer = setInterval(refresh, 60_000);
+    let turnRefreshTimer = null;
+    const refreshAfterTurn = () => {
+      turnRefreshTimer = setTimeout(refresh, 1_200);
+    };
+    window.addEventListener(turnCompletedEvent, refreshAfterTurn);
+    window.addEventListener("beforeunload", () => {
+      clearInterval(timer);
+      if (turnRefreshTimer !== null) clearTimeout(turnRefreshTimer);
+    }, { once: true });
+  })(e.ipcRenderer,"codex_linux:multi-auth-pool-status","codex-linux-turn-completed"),getBuildFlavor:()=>\`prod\`};`;
+
+  const upgraded = applyTwice(applyPreloadPatch, installedPreload);
+  assert.doesNotMatch(upgraded, /Updated moments ago/);
+  assert.match(upgraded, /Updated \$\{seconds\} seconds ago/);
+  assert.match(upgraded, /const ageTimer = setInterval/);
+  assert.match(upgraded, /clearInterval\(ageTimer\)/);
+  assert.match(upgraded, /codex_linux:multi-auth-pool-refresh/);
+  assert.match(upgraded, /Refreshing…/);
+  assert.doesNotMatch(upgraded, /role", "tooltip/);
+  assert.doesNotThrow(() => new Function(upgraded));
 });
 
 test("adds the routed account and its quota rows to the current status dialog", () => {
@@ -300,11 +421,74 @@ test("exposes all three patch phases only when the feature is enabled", () => {
     });
     assert.deepEqual(
       descriptors.map((descriptor) => descriptor.phase),
-      ["main-bundle", "extracted-app:post-webview", "webview-asset", "webview-asset"],
+      [
+        "main-bundle",
+        "extracted-app:post-webview",
+        "webview-asset",
+        "webview-asset",
+        "webview-asset",
+      ],
     );
   } finally {
     if (previous == null) delete process.env.CODEX_LINUX_FEATURES_CONFIG;
     else process.env.CODEX_LINUX_FEATURES_CONFIG = previous;
     fs.rmSync(temp, { recursive: true, force: true });
   }
+});
+
+test("stages a prelaunch hook that restores a missing bound router", async () => {
+  const featuresRoot = path.resolve(__dirname, "..");
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "codex-multi-auth-router-prelaunch-"));
+  const configPath = path.join(temp, "features.json");
+  const codexHome = path.join(temp, "codex-home");
+  const appDir = path.join(temp, "app");
+  const bindDir = path.join(codexHome, "multi-auth", "app-bind");
+  const statusPath = path.join(bindDir, "status.json");
+  const statePath = path.join(bindDir, "runtime-rotation-app-bind.json");
+  const logPath = path.join(bindDir, "router.log");
+  const routerPath = path.join(temp, "fake-router.cjs");
+  const bundledNode = path.join(appDir, "resources", "node-runtime", "bin", "node");
+  const port = await reserveLoopbackPort();
+  fs.mkdirSync(path.dirname(bundledNode), { recursive: true });
+  fs.mkdirSync(bindDir, { recursive: true });
+  fs.symlinkSync(process.execPath, bundledNode);
+  fs.writeFileSync(configPath, JSON.stringify({ enabled: ["multi-auth-thread-status"] }));
+  fs.writeFileSync(
+    routerPath,
+    [
+      'const fs=require("node:fs"),http=require("node:http");',
+      'let args=Object.fromEntries(process.argv.slice(2).reduce((a,v,i,x)=>i%2?a:[...a,[v,x[i+1]]],[]));',
+      'let server=http.createServer((req,res)=>res.end("ok"));',
+      'server.listen(Number(args["--port"]),"127.0.0.1",()=>fs.writeFileSync(args["--status"],JSON.stringify({pid:process.pid,state:"running"})));',
+      'process.on("SIGTERM",()=>server.close(()=>process.exit(0)));',
+    ].join(""),
+  );
+  fs.writeFileSync(
+    statePath,
+    JSON.stringify({
+      version: 1,
+      host: "127.0.0.1",
+      port,
+      nodePath: process.execPath,
+      routerScriptPath: routerPath,
+      statusPath,
+      statePath,
+      logPath,
+    }),
+  );
+
+  const plan = enabledLinuxFeatureInstallPlan({ featuresRoot, featuresConfigPath: configPath });
+  const hook = plan.runtimeHooks.find(
+    (entry) => entry.id === "multi-auth-thread-status" && entry.key === "prelaunch",
+  );
+  assert.ok(hook);
+  const result = spawnSync(hook.source, [appDir], {
+    encoding: "utf8",
+    env: { ...process.env, CODEX_HOME: codexHome },
+    timeout: 10_000,
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const routerStatus = JSON.parse(fs.readFileSync(statusPath, "utf8"));
+  assert.equal(routerStatus.state, "running");
+  process.kill(routerStatus.pid, "SIGTERM");
 });
