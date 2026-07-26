@@ -1,0 +1,9 @@
+{
+  "id": "turn-completion-diagnostics",
+  "title": "Turn Completion Diagnostics",
+  "description": "Adds focused Codex core and app-server tracing for turns that stop without a final answer.",
+  "defaultEnabled": false,
+  "runtimeHooks": {
+    "env": "env"
+  }
+}

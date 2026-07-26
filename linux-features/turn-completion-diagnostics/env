@@ -1,0 +1,3 @@
+# Keep tracing focused on turn completion and protocol delivery. Broad debug
+# filters make the launcher log grow too quickly to preserve the useful window.
+RUST_LOG=codex_core::session::turn=trace,codex_core::session::handlers=debug,codex_core::client=debug,codex_core::stream_events_utils=debug,codex_app_server::request_processors::thread_lifecycle=debug,codex_app_server::outgoing_message=debug
