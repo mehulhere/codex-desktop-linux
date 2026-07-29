@@ -333,6 +333,34 @@ test("GPT-5.6 allowlist behavior admits only visible GPT-5.6 models", () => {
   );
 });
 
+test("model picker admits advertised ClinePass Kimi without injecting it", () => {
+  const evaluateAvailability = ({ model, hidden, availableModels }) => {
+    const patchedExpression = applyGpt56AllowlistPatch(`return ${MODEL_ALLOWLIST_MARKER};`);
+    return Function("l", "t", "n", patchedExpression)(
+      true,
+      new Set(availableModels),
+      { model, hidden },
+    );
+  };
+
+  assert.equal(
+    evaluateAvailability({
+      model: "cline-pass/kimi-k3",
+      hidden: false,
+      availableModels: ["cline-pass/kimi-k3"],
+    }),
+    true,
+  );
+  assert.equal(
+    evaluateAvailability({
+      model: "cline-pass/kimi-k3",
+      hidden: false,
+      availableModels: [],
+    }),
+    false,
+  );
+});
+
 test("GPT-5.6 Power slider follows reasoning efforts enabled in settings", () => {
   const source = modelPickerPowerBundleFixture();
   const patched = applyDynamicSupportedReasoningEffortsPatch(source);
