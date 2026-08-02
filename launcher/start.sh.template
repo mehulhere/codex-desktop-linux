@@ -3223,6 +3223,10 @@ should_disable_gpu_compositing() {
         echo "Invalid CODEX_ELECTRON_DISABLE_GPU_COMPOSITING='${CODEX_ELECTRON_DISABLE_GPU_COMPOSITING:-}'; using rendering profile default" >&2
     fi
 
+    if [ "$(effective_electron_ozone_platform)" = "x11" ]; then
+        return 1
+    fi
+
     if [ "${XDG_SESSION_TYPE:-}" = "wayland" ] &&
         [ "$ELECTRON_RENDERING_MODE" != "wayland-gpu" ] &&
         [ "$ELECTRON_RENDERING_MODE" != "wslg" ]; then
