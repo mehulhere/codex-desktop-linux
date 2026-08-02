@@ -74,8 +74,11 @@ const COMPOSER_SUBMIT_REGISTRATION_REPLACEMENT =
   'let codexLinuxFarfieldTakeoverSubmitRegistration=(0,XY.useEffect)(()=>{if(V==null||Ts.type!==`local`||Zo!=null&&Zo!==`empty-message`)return;let e=async e=>{Fn.setText(e);let t=null;await js({promptRawOverride:e,persistedPromptRawOverride:e,focusComposerAfterSubmit:!0,onLocalTurnStarted:e=>{t=e},onQueuedFollowUp:e=>{t={threadId:V,queuedFollowUpId:e}}});if(t==null)throw Error(`Native composer did not accept the takeover message.`);return t};return globalThis.codexLinuxFarfieldRegisterTakeoverSubmit(V,e)},[V,Fn,js,Ts.type,Zo])';
 const CURRENT_COMPOSER_SUBMIT_REGISTRATION_NEEDLE =
   '(0,$q.useEffect)(()=>{},[null,Cn])';
-const CURRENT_COMPOSER_SUBMIT_REGISTRATION_REPLACEMENT =
+const CURRENT_COMPOSER_CONTINUE_REGISTRATION =
   'let codexLinuxContinueButtonRegistration=(0,$q.useEffect)(()=>{if(H==null||L?.type!==`local`)return;let e=()=>{let e=document.querySelector("textarea")?.closest("form")??document.querySelector("[contenteditable=\\"true\\"]")?.closest("form");if(e==null||e.querySelector("[data-codex-linux-continue-button]")!=null)return;let t=document.createElement("button");t.type="button",t.dataset.codexLinuxContinueButton="true",t.textContent="Continue",t.title="Send Continue",t.className="codex-linux-continue-button",Object.assign(t.style,{marginRight:"8px",border:"0",borderRadius:"9999px",padding:"7px 12px",background:"transparent",color:"inherit",font:"inherit",cursor:"pointer"}),t.addEventListener("click",async()=>{t.disabled=!0;try{await Rs({focusComposerAfterSubmit:!0,persistedPromptRawOverride:"Continue",promptRawOverride:"Continue",skipGoalSubmit:!0})}finally{t.disabled=!1}});let n=e.querySelector("button[type=submit]");n?.parentElement?.insertBefore(t,n)},t=new MutationObserver(e);return e(),t.observe(document.documentElement,{childList:!0,subtree:!0}),()=>t.disconnect()},[H,L?.type,Rs]);const codexLinuxContinueButton=!0';
+const CURRENT_COMPOSER_SUBMIT_REGISTRATION_REPLACEMENT =
+  'let codexLinuxFarfieldTakeoverSubmitRegistration=(0,$q.useEffect)(()=>{if(H==null||L?.type!==`local`)return;let e=async e=>{Cn.setText(e);await Rs({focusComposerAfterSubmit:!0,persistedPromptRawOverride:e,promptRawOverride:e,skipGoalSubmit:!0});return{threadId:H}};return globalThis.codexLinuxFarfieldRegisterTakeoverSubmit(H,e)},[H,L?.type,Cn,Rs]),' +
+  CURRENT_COMPOSER_CONTINUE_REGISTRATION;
 const COMPOSER_TURN_STARTED_NEEDLE =
   'onLocalTurnStarted:e=>{xn!=null&&e.threadId!=null&&e.turnId!=null&&Vb(N,xn.itemId,e.threadId,e.turnId)},openSideChatFromComposer:_s';
 const COMPOSER_TURN_STARTED_REPLACEMENT =
@@ -209,9 +212,25 @@ function applyFarfieldQueuePatch(source) {
 }
 
 function applyFarfieldComposerPatch(source) {
-  if (source.includes("codexLinuxContinueButton")) return source;
+  if (
+    source.includes("codexLinuxContinueButton") &&
+    (source.includes("codexLinuxFarfieldTakeoverSubmitRegistration") ||
+      source.includes("globalThis.codexLinuxFarfieldRegisterTakeoverSubmit="))
+  ) {
+    return source;
+  }
+  if (
+    source.includes("codexLinuxContinueButton") &&
+    source.includes(CURRENT_COMPOSER_CONTINUE_REGISTRATION)
+  ) {
+    const withoutMarker = source.replace(`const ${COMPOSER_MARKER}=!0;`, "");
+    return `${COMPOSER_BOOTSTRAP}${withoutMarker.replace(
+      CURRENT_COMPOSER_CONTINUE_REGISTRATION,
+      CURRENT_COMPOSER_SUBMIT_REGISTRATION_REPLACEMENT,
+    )}`;
+  }
   if (source.includes(CURRENT_COMPOSER_SUBMIT_REGISTRATION_NEEDLE)) {
-    return `const ${COMPOSER_MARKER}=!0;${source.replace(
+    return `${COMPOSER_BOOTSTRAP}${source.replace(
       CURRENT_COMPOSER_SUBMIT_REGISTRATION_NEEDLE,
       CURRENT_COMPOSER_SUBMIT_REGISTRATION_REPLACEMENT,
     )}`;

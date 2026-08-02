@@ -179,15 +179,32 @@ test("upgrades an already-patched composer bundle with the Continue button", () 
   assert.equal(applyFarfieldComposerPatch(patched), patched);
 });
 
-test("adds the Continue button to the current composer bundle", () => {
+test("adds takeover submission and the Continue button to the current composer bundle", () => {
   const patched = applyFarfieldComposerPatch('(0,$q.useEffect)(()=>{},[null,Cn])');
 
+  assert.match(patched, /codexLinuxFarfieldTakeoverSubmitRegistration/);
+  assert.match(patched, /codexLinuxFarfieldRegisterTakeoverSubmit\(H,e\)/);
+  assert.match(patched, /Cn\.setText\(e\)/);
+  assert.match(patched, /persistedPromptRawOverride:e/);
+  assert.match(patched, /promptRawOverride:e/);
   assert.match(patched, /codexLinuxContinueButtonRegistration/);
   assert.match(patched, /persistedPromptRawOverride:"Continue"/);
   assert.match(patched, /promptRawOverride:"Continue"/);
   assert.match(patched, /skipGoalSubmit:!0/);
   assert.match(patched, /data-codex-linux-continue-button/);
   assert.equal(applyFarfieldComposerPatch(patched), patched);
+});
+
+test("upgrades a current composer bundle that previously shipped only Continue", () => {
+  const continueOnly = applyFarfieldComposerPatch('(0,$q.useEffect)(()=>{},[null,Cn])')
+    .replace(/let codexLinuxFarfieldTakeoverSubmitRegistration=.*?,(?=let codexLinuxContinueButtonRegistration)/, "")
+    .replace(/const codexLinuxFarfieldComposer=!0;\(\(\)=>\{.*?\}\)\(\);/, "const codexLinuxFarfieldComposer=!0;");
+
+  const upgraded = applyFarfieldComposerPatch(continueOnly);
+  assert.match(upgraded, /codexLinuxFarfieldRegisterTakeoverSubmit/);
+  assert.match(upgraded, /codexLinuxFarfieldTakeoverSubmitRegistration/);
+  assert.match(upgraded, /codexLinuxContinueButtonRegistration/);
+  assert.equal(applyFarfieldComposerPatch(upgraded), upgraded);
 });
 
 test("forwards composer requests without reloading app windows", () => {
