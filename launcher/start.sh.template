@@ -298,6 +298,8 @@ Environment:
                               Override --disable-dev-shm-usage; auto keeps it only when /dev/shm is missing or small
   CODEX_LAUNCHER_LOCK_WAIT_SECONDS=N
                               Seconds to wait for another launcher to leave the startup lock (default: 5)
+  CODEX_LAUNCHER_LOG_MAX_BYTES=N
+                              Rotate launcher.log at this size (default: 10485760 bytes)
   CODEX_FORCE_RENDERER_ACCESSIBILITY=auto|0|1
                               Override --force-renderer-accessibility; auto forces it only when assistive
                               technology is detected and never under WSLg or native wayland-gpu
@@ -333,7 +335,32 @@ if [[ "${LAUNCHER_ARGS[0]:-}" == "--diagnose-scaling" ]]; then
         exec 2>&"$LAUNCHER_EARLY_STDERR_FD"
     fi
 else
+    launcher_log_max_bytes="${CODEX_LAUNCHER_LOG_MAX_BYTES:-10485760}"
+    case "$launcher_log_max_bytes" in
+        ""|*[!0-9]*|0)
+            echo "Invalid CODEX_LAUNCHER_LOG_MAX_BYTES=$launcher_log_max_bytes; using 10485760" >&2
+            launcher_log_max_bytes=10485760
+            ;;
+    esac
+    launcher_log_rotated=0
+    if [ -f "$LOG_FILE" ]; then
+        launcher_log_size="$(stat -c %s -- "$LOG_FILE" 2>/dev/null || printf '0')"
+        if [ "$launcher_log_size" -gt "$launcher_log_max_bytes" ]; then
+            launcher_log_archive_tmp="$LOG_FILE.1.tmp.$$"
+            if tail -c "$launcher_log_max_bytes" -- "$LOG_FILE" > "$launcher_log_archive_tmp"; then
+                mv -f -- "$launcher_log_archive_tmp" "$LOG_FILE.1"
+                : > "$LOG_FILE"
+                launcher_log_rotated=1
+            else
+                rm -f -- "$launcher_log_archive_tmp"
+                echo "Unable to rotate launcher log at $LOG_FILE" >&2
+            fi
+        fi
+    fi
     exec >>"$LOG_FILE" 2>&1
+    if [ "$launcher_log_rotated" -eq 1 ]; then
+        echo "[$(date -Is)] launcher_log_rotated=true max_bytes=$launcher_log_max_bytes archive=$LOG_FILE.1"
+    fi
 fi
 
 echo "[$(date -Is)] Starting $CODEX_LINUX_APP_DISPLAY_NAME launcher"

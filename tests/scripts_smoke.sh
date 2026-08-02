@@ -4948,6 +4948,9 @@ exit 0
 SCRIPT
     chmod +x "$app_dir/electron"
 
+    mkdir -p "$(dirname "$launcher_log")"
+    dd if=/dev/zero of="$launcher_log" bs=2048 count=1 status=none
+
     set +e
     timeout 20 env -i \
         PATH="$HOST_TOOL_PATH" \
@@ -4955,6 +4958,7 @@ SCRIPT
         XDG_RUNTIME_DIR="$runtime_dir" \
         CODEX_CLI_PATH="$TRUE_BIN" \
         CODEX_WEBVIEW_PORT=45675 \
+        CODEX_LAUNCHER_LOG_MAX_BYTES=1024 \
         ELECTRON_RENDERER_URL="http://127.0.0.1:9999/" \
         ELECTRON_MARKER="$electron_marker" \
         "$app_dir/start.sh" >/dev/null 2>&1
@@ -4964,6 +4968,10 @@ SCRIPT
     [ "$rc" -ne 124 ] || fail "Launcher hung while handling a missing webview entrypoint"
     [ "$rc" -ne 0 ] || fail "Launcher should fail when webview/index.html is missing"
     [ ! -e "$electron_marker" ] || fail "Launcher should not reach Electron when webview/index.html is missing"
+    assert_file_exists "$launcher_log.1"
+    [ "$(stat -c %s "$launcher_log.1")" -le 1024 ] \
+        || fail "Launcher log archive must honor CODEX_LAUNCHER_LOG_MAX_BYTES"
+    assert_contains "$launcher_log" "launcher_log_rotated=true max_bytes=1024"
     assert_contains "$launcher_log" "webview bundle is incomplete"
 
     rm -f "$electron_marker"
@@ -10286,6 +10294,7 @@ test_notification_actions_bridge_accepts_prebuilt_binary() {
 
 main() {
     test_common_helper_sourcing
+    test_launcher_rejects_missing_webview_entrypoint
     test_package_icon_source_resolution
     test_extract_webview_replaces_linux_icon_assets
     test_installer_prefers_compact_upstream_chatgpt_icon
@@ -10403,7 +10412,6 @@ main() {
     test_packaged_runtime_keeps_managed_node_out_of_user_service_path
     test_launcher_extra_bundled_plugin_cache_rollback
     test_launcher_extra_bundled_plugin_cache_concurrent_destination
-    test_launcher_rejects_missing_webview_entrypoint
     test_launcher_marketplace_metadata_atomic_staging
     test_launcher_template_sanity
     test_launcher_warm_start_recovery
