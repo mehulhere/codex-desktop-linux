@@ -190,7 +190,7 @@ test("adds the Continue button to the current composer bundle", () => {
   assert.equal(applyFarfieldComposerPatch(patched), patched);
 });
 
-test("forwards composer requests to the primary renderer and refreshes all app windows", () => {
+test("forwards composer requests without reloading app windows", () => {
   const fixture = [
     mainMethodMapNeedle,
     mainPendingMapNeedle,
@@ -227,10 +227,10 @@ test("forwards composer requests to the primary renderer and refreshes all app w
     /addRequestHandler\(`thread-follower-refresh-conversation`,async\(\)=>!0,async t=>/,
   );
   assert.match(patched, /let\{conversationId:n\}=t\.params/);
-  assert.match(patched, /c\.BrowserWindow\.getAllWindows\(\)/);
-  assert.match(patched, /windowManager\.isAppServiceWindow\(n\)/);
-  assert.match(patched, /\.webContents\.reload\(\)/);
-  assert.match(patched, /return\{conversationId:n,refreshScheduled:!0\}/);
+  assert.doesNotMatch(patched, /c\.BrowserWindow\.getAllWindows\(\)/);
+  assert.doesNotMatch(patched, /windowManager\.isAppServiceWindow\(n\)/);
+  assert.doesNotMatch(patched, /\.webContents\.reload\(\)/);
+  assert.match(patched, /return\{conversationId:n,refreshScheduled:!1\}/);
   assert.doesNotMatch(patched, /thread-follower-refresh-conversation-response/);
   assert.match(
     patched,
@@ -252,6 +252,8 @@ test("upgrades the refresh handler in an already-patched Desktop bundle", () => 
     /addRequestHandler\(`thread-follower-refresh-conversation`,async\(\)=>!0,async t=>/,
   );
   assert.doesNotMatch(patched, /typeof t\.conversationId/);
+  assert.doesNotMatch(patched, /\.webContents\.reload\(\)/);
+  assert.match(patched, /refreshScheduled:!1/);
   assert.equal(applyFarfieldMainProcessPatch(patched), patched);
 });
 
