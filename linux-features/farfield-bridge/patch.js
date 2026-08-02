@@ -44,6 +44,8 @@ const MAIN_REFRESH_PREDICATE_REPLACEMENT =
   'addRequestHandler(`thread-follower-refresh-conversation`,async()=>!0,async t=>';
 const MAIN_REFRESH_HANDLER_NEEDLE =
   'async t=>{if(typeof t.conversationId!==`string`||t.conversationId.length===0)throw Error(`Refresh conversationId is required.`);let n=c.BrowserWindow.getAllWindows().filter(n=>!n.isDestroyed()&&this.options.windowManager.isAppServiceWindow(n));if(n.length===0)throw Error(`No Desktop app window is available for refresh.`);setTimeout(()=>{for(let t of n)t.isDestroyed()||t.webContents.isDestroyed()||t.webContents.reload()},0);return{conversationId:t.conversationId,refreshScheduled:!0}}';
+const MAIN_REFRESH_HANDLER_UNSAFE_NEEDLE =
+  'async t=>{let{conversationId:n}=t.params;if(typeof n!==`string`||n.length===0)throw Error(`Refresh conversationId is required.`);let r=c.BrowserWindow.getAllWindows().filter(n=>!n.isDestroyed()&&this.options.windowManager.isAppServiceWindow(n));if(r.length===0)throw Error(`No Desktop app window is available for refresh.`);setTimeout(()=>{for(let t of r)t.isDestroyed()||t.webContents.isDestroyed()||t.webContents.reload()},0);return{conversationId:n,refreshScheduled:!0}}';
 const MAIN_REFRESH_HANDLER_REPLACEMENT =
   'async t=>{let{conversationId:n}=t.params;if(typeof n!==`string`||n.length===0)throw Error(`Refresh conversationId is required.`);return{conversationId:n,refreshScheduled:!1}}';
 
@@ -104,6 +106,12 @@ function applyFarfieldMainProcessPatch(source) {
     let patched = source;
     if (patched.includes(MAIN_REFRESH_HANDLER_NEEDLE)) {
       patched = patched.replace(MAIN_REFRESH_HANDLER_NEEDLE, MAIN_REFRESH_HANDLER_REPLACEMENT);
+    }
+    if (patched.includes(MAIN_REFRESH_HANDLER_UNSAFE_NEEDLE)) {
+      patched = patched.replace(
+        MAIN_REFRESH_HANDLER_UNSAFE_NEEDLE,
+        MAIN_REFRESH_HANDLER_REPLACEMENT,
+      );
     }
     if (patched.includes(MAIN_REFRESH_PREDICATE_NEEDLE)) {
       patched = patched.replace(

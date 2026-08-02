@@ -257,6 +257,16 @@ test("upgrades the refresh handler in an already-patched Desktop bundle", () => 
   assert.equal(applyFarfieldMainProcessPatch(patched), patched);
 });
 
+test("upgrades the installed reload-based refresh handler", () => {
+  const installedRefreshHandler = 'addRequestHandler(`thread-follower-refresh-conversation`,async()=>!0,async t=>{let{conversationId:n}=t.params;if(typeof n!==`string`||n.length===0)throw Error(`Refresh conversationId is required.`);let r=c.BrowserWindow.getAllWindows().filter(n=>!n.isDestroyed()&&this.options.windowManager.isAppServiceWindow(n));if(r.length===0)throw Error(`No Desktop app window is available for refresh.`);setTimeout(()=>{for(let t of r)t.isDestroyed()||t.webContents.isDestroyed()||t.webContents.reload()},0);return{conversationId:n,refreshScheduled:!0}})';
+  const source = `const codexLinuxFarfieldMainProcess=!0;${installedRefreshHandler}`;
+  const patched = applyFarfieldMainProcessPatch(source);
+
+  assert.doesNotMatch(patched, /\.webContents\.reload\(\)/);
+  assert.match(patched, /return\{conversationId:n,refreshScheduled:!1\}/);
+  assert.equal(applyFarfieldMainProcessPatch(patched), patched);
+});
+
 test("serializes Linux IPC router startup across Desktop windows", () => {
   const patched = applyFarfieldRouterPatch(`${routerNeedle};${versionNeedle}`);
 
